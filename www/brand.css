@@ -22,3 +22,120 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .route-navigation{margin:14px 0}.route-navigation p{margin:6px 0 10px}
 @media(max-width:360px){.login-screen{padding:20px 12px}.login-card{padding:24px 18px}.login-brand h1{font-size:21px}.login-brand small{font-size:11px}}
 @media(min-width:701px){.side{border-right:1px solid var(--line)}.side .brand{padding:6px 8px 22px}.login-card{padding:32px}}
+
+/* Shared screens for the public login and the three operational profiles. */
+:root {
+  --surface: #fff;
+  --surface-alt: #f1f4f7;
+  --paper: #f5f7fa;
+  --line: #dce3e9;
+  --ink: #172635;
+  --muted: #546576;
+  --primary: #cf1327;
+}
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.app { background: var(--surface); }
+.login-screen { background: #081e2b; }
+.login-layout { width: min(100%, 960px); margin: auto; }
+.login-intro { display: none; }
+.login-card { background: var(--surface); width: 100%; }
+.login-settings { display: flex; align-items: end; justify-content: space-between; gap: 12px; color: var(--muted); }
+.appearance-control { display: grid; gap: 3px; font-size: 11px; font-weight: 700; }
+.appearance-control select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 3px 8px;
+  background: var(--surface-alt);
+  color: var(--ink);
+  font: inherit;
+}
+.top-appearance { grid-column: 1 / -1; grid-row: 2; grid-template-columns: auto auto; align-items: center; justify-content: start; color: #d5e1e8; }
+.top-appearance select { background: #173743; border-color: #56717a; color: #fff; }
+.field :is(input, select, textarea) { background: var(--surface-alt); color: var(--ink); border-color: var(--line); }
+.field :is(input, select, textarea):focus { background: var(--surface); }
+.store-overview { align-items: flex-start; flex-wrap: wrap; }
+.store-overview h1 { font-size: clamp(26px, 5vw, 36px); }
+.dashboard-actions .btn { flex: 1 1 auto; }
+.activity-filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+.activity-day h3 { margin: 18px 0 7px; color: var(--muted); font-size: 12px; }
+.activity-row { border: 1px solid var(--line); border-radius: 10px; margin: 5px 0; background: var(--surface); }
+.activity-row summary { display: flex; gap: 10px; justify-content: space-between; align-items: center; padding: 9px 12px; cursor: pointer; }
+.activity-row summary::marker { content: ""; }
+.activity-row summary::after { content: "+"; color: var(--muted); font-weight: 750; }
+.activity-row[open] summary::after { content: "−"; }
+.activity-label { display: grid; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.activity-label small { color: var(--muted); }
+.activity-badges { display: flex; flex-wrap: wrap; gap: 3px; justify-content: end; }
+.activity-row .order { margin: 0 6px 6px; }
+.activity-empty { margin-bottom: 0; }
+.order-itinerary { display: grid; gap: 5px; margin: 9px 0; }
+.order-itinerary span { min-width: 0; overflow-wrap: anywhere; }
+.order-itinerary b { color: var(--muted); margin-inline-end: 4px; }
+.order-estimates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; border-radius: 10px; background: var(--bluebg); color: var(--blue); }
+.order-estimates > div { display: grid; gap: 2px; padding: 8px 10px; min-width: 0; }
+.order-estimates > div + div { border-inline-start: 1px solid currentColor; }
+
+@media (min-width: 900px) {
+  .login-layout { display: grid; grid-template-columns: 1fr minmax(0, 460px); align-items: center; gap: 64px; }
+  .login-intro { display: block; color: #f5f9fc; }
+  .login-intro img { border-radius: 22px; }
+  .login-intro p { color: #a6c0d1; margin: 22px 0 8px; font-weight: 650; }
+  .login-intro h2 { margin: 0; max-width: 13ch; font-size: clamp(40px, 6vw, 66px); font-weight: 800; line-height: 1.04; letter-spacing: -.055em; }
+  .side { width: 224px; overflow-y: auto; }
+  .content { width: calc(100% - 42px); }
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .selectors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px auto auto; }
+  .top-appearance { grid-column: 6; grid-row: 1; grid-template-columns: auto; }
+}
+@media (max-width: 380px) {
+  .activity-filters { grid-template-columns: 1fr; }
+  .activity-row summary { flex-wrap: wrap; }
+}
+@media (max-width: 899px) {
+  .nav { grid-auto-columns: minmax(62px, 1fr); overflow-x: auto; }
+  .nav button { font-size: 10px; }
+}
+
+:root[data-appearance="dark"] {
+  color-scheme: dark;
+  --surface: #152532;
+  --surface-alt: #1c3040;
+  --paper: #101d28;
+  --line: #39505e;
+  --ink: #edf5f9;
+  --muted: #b4c8d5;
+  --red-dark: #ff9aa4;
+  --redbg: #4b2330;
+  --blue: #a9cbff;
+  --bluebg: #1c3555;
+  --mint: #183b33;
+  --green-dark: #a0efcb;
+  --orange: #ffcf94;
+  --orangebg: #483221;
+  --purple: #ded0ff;
+  --purplebg: #372b4c;
+}
+[data-appearance="dark"] body,
+[data-appearance="dark"] .side,
+[data-appearance="dark"] .mobile-sheet-card,
+[data-appearance="dark"] .sheet-header,
+[data-appearance="dark"] .sheet-footer,
+[data-appearance="dark"] .track-box,
+[data-appearance="dark"] .express-dialog,
+[data-appearance="dark"] .stat,
+[data-appearance="dark"] .panel,
+[data-appearance="dark"] .order,
+[data-appearance="dark"] .registry-entry,
+[data-appearance="dark"] .integration-toggle,
+[data-appearance="dark"] .btn.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
+[data-appearance="dark"] :is(.role-tabs, .quick-controls, .quick-grid button, .side-note, .queue-legend, .order-notes, .empty, .check, .sheet-close-btn, .gray) {
+  background: var(--surface-alt);
+  color: var(--ink);
+  border-color: var(--line);
+}
+[data-appearance="dark"] :is(.field label, .side-note b, .empty b, .meta, .order-store, .role-btn, .auth-tab, .nav button) { color: var(--muted); }
+[data-appearance="dark"] .side .nav button.active { background: var(--redbg); color: var(--red-dark); }
+[data-appearance="dark"] .auth-tab.active { color: var(--red-dark); }
+[data-appearance="dark"] .order-care { background: var(--orangebg); color: var(--orange); }
+[data-appearance="dark"] .v3-tutorial { background: var(--surface); }

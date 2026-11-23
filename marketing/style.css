@@ -5,3 +5,13 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}.button:hover{transform:none}}
 
 .ui-icon{width:1.1em;height:1.1em;vertical-align:-.16em;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:inline-block;flex-shrink:0}
+
+:root { --paper: #f5f7fa; --ink: #172635; --line: #dce3e9; --radius: 15px; }
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.hero-art { border-radius: var(--radius); }
+.join-option { padding: 22px; background: #173541; }
+.join-option p { font-size: 12px; }
+.nav-access:focus-visible, .join-option:focus-visible { outline: 3px solid #ffd279; outline-offset: 4px; }
+@media (max-width: 760px) {
+  .join-option { padding: 17px; }
+}

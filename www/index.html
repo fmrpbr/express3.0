@@ -209,6 +209,31 @@
  .route-stops{padding-left:20px;display:grid;gap:18px}.route-stops li{border-top:1px solid #ddd;padding-top:12px;overflow-wrap:anywhere}.route-stops p{margin:8px 0}.route-stops .btn{margin:5px 4px 0 0}#quote-price-mobile{font-size:18px;overflow-wrap:anywhere}
 </style>
 <style>#mobile-order-form [hidden]{display:none!important}</style><style>.browser-preferences{margin-top:18px}.browser-preferences summary,.browser-notice-history summary{cursor:pointer;font-weight:800;padding:6px 0}.browser-preferences .quick-grid{margin-top:12px}.browser-spotlight{padding:12px 14px;margin-bottom:12px}.browser-spotlight p{margin:6px 0}.browser-spotlight small{font-size:11px}.browser-notice-history{margin:14px 0}.browser-notice-history .registry-entry{margin-top:12px}</style><link rel="stylesheet" href="./brand.css">
+<link rel="stylesheet" href="./brand.css">
+<script>
+(() => {
+  const key = 'express-appearance';
+  const system = matchMedia('(prefers-color-scheme: dark)');
+  let preference = 'auto';
+  try { preference = localStorage.getItem(key) || 'auto'; } catch {}
+  if (!['auto', 'light', 'dark'].includes(preference)) preference = 'auto';
+  function applyAppearance() {
+    document.documentElement.dataset.appearance = preference === 'auto'
+      ? (system.matches ? 'dark' : 'light')
+      : preference;
+    for (const select of document.querySelectorAll('[data-appearance-select]')) select.value = preference;
+  }
+  applyAppearance();
+  document.addEventListener('DOMContentLoaded', applyAppearance);
+  system.addEventListener('change', applyAppearance);
+  document.addEventListener('change', event => {
+    if (!event.target.matches('[data-appearance-select]')) return;
+    preference = event.target.value;
+    try { localStorage.setItem(key, preference); } catch {}
+    applyAppearance();
+  });
+})();
+</script>
 </head>
 <body>
 
@@ -335,6 +360,12 @@
 
 <!-- Tela de Login -->
 <div id="login-screen" class="login-screen">
+  <div class="login-layout">
+    <div class="login-intro">
+      <img src="./icons/icon-192.png" alt="" width="96" height="96">
+      <p>Express Entregas</p>
+      <h2>Entregas para sua loja, em Aracruz.</h2>
+    </div>
   <div class="login-card">
     <div class="login-brand">
       <div class="logo"><img src="./icons/icon-192.png" alt=""></div>
@@ -402,8 +433,18 @@
       <button type="button" class="btn secondary full" data-action="recovery-back">Voltar para entrar</button>
     </section>
     <p style="text-align:center;font-size:12px;margin:16px 0"><a href="./cadastro/" style="color:var(--red-dark)">Conheça o Express Entregas</a> · <a href="https://express-v2-web-fmrpbr.web.app/download/" style="color:var(--red-dark)">Baixar aplicativo</a></p>
-    <p data-app-version style="text-align:center;font-size:12px;color:#666;margin:14px 0 0">Versão 3.0.0</p>
+    <div class="login-settings">
+      <label class="appearance-control">Aparência
+        <select data-appearance-select>
+          <option value="auto">Automático</option>
+          <option value="light">Claro</option>
+          <option value="dark">Escuro</option>
+        </select>
+      </label>
+      <small data-app-version>Versão 3.0.0</small>
+    </div>
     <button type="button" id="admin-entry-button" class="btn secondary full" style="margin-top:15px; width:100%" data-admin-login>🔒 Entrar como Administrador</button>
+  </div>
   </div>
 </div>
 
@@ -587,6 +628,13 @@
         <h2 id="page-title">Painel de Controle</h2>
       </div>
       <div class="selectors">
+        <label class="appearance-control top-appearance">Aparência
+          <select data-appearance-select>
+            <option value="auto">Automático</option>
+            <option value="light">Claro</option>
+            <option value="dark">Escuro</option>
+          </select>
+        </label>
         <label class="selectbox"><small>PERFIL</small><select id="role" disabled></select></label>
         <label class="selectbox"><small id="actor-label">USUÁRIO</small><select id="actor"></select></label>
         <button type="button" id="avatar" class="avatar" data-nav="profile" aria-label="Meu perfil">EE</button>
@@ -1958,8 +2006,21 @@
     let clientLine = (isSpecialQuote || (role === "courier" && !o.courierId)) ? "Cotação especial · sem dados do cliente nesta etapa" : "Cliente: <b>"+esc(o.client)+"</b> "+(o.phone ? "("+esc(o.phone)+")" : "");
     let serviceBadge = o.serviceType === "collection" ? '<span class="tag orange">🔄 RECOLHA</span>' : o.serviceType === "roundtrip" ? '<span class="tag purpletag">🔁 2 VIAGENS</span>' : '<span class="tag bluetag">🚚 ENTREGA</span>';
 
+    const clientAddress = locationLine || esc(o.address || o.clientNeighborhood || 'Endereço após o aceite');
+    const storeAddress = esc(o.storeAddress || o.storeName || 'Loja · endereço após o aceite');
+    const collection = o.serviceType === 'collection' || o.serviceType === 'roundtrip';
+    const origin = collection ? clientAddress : storeAddress;
+    const destination = collection ? storeAddress : clientAddress;
+    const itinerary = !isSpecialQuote && (role === 'courier' || role === 'store')
+      ? '<div class="order-itinerary">' +
+        (role === 'courier' ? '<span><b>Origem</b> ' + origin + '</span>' : '') +
+        '<span><b>Destino</b> ' + destination + '</span></div>'
+      : '<h3>📍 ' + locationLine + '</h3>';
+    const estimates = role === 'courier' && isOffer(o)
+      ? '<div class="order-estimates"><div><small>Distância</small><b>Sem estimativa</b></div><div><small>Tempo previsto</small><b>Sem estimativa</b></div></div>'
+      : '';
     const returnHtml=returnControls(o);
-    return '<article data-order-id="'+esc(o.id)+'" class="order '+queueClass+'"><div class="order-top"><div><div class="id">'+esc(o.orderCode || o.id)+' · '+date(o.created)+' '+serviceBadge+'</div><h3>📍 '+locationLine+'</h3><div class="order-store">'+clientLine+'</div></div><div style="text-align:right"><span class="tag '+tag+'">'+st+'</span><div class="fee">'+(o.status==="cotacao"?"A definir":cash(o.fee))+'</div></div></div>'+queueBadge+'<div class="meta"><span>📅 Data: '+esc(formatServiceDate(o.serviceDate))+'</span><span>🔧 Serviço: '+esc(serviceTypeLabel(o.serviceType))+'</span><span>🏪 Loja: '+esc(o.storeName)+'</span><span>♙ Motoboy: '+esc(o.courierName||"Aguardando")+'</span>'+' '+creationTimerHtml+' '+pickupTimerHtml+' '+runDurationHtml+'</div>'+returnHtml+careDetails(o)+trackingShareHtml+bidsHtml+gpsTrackingInfo+(o.status === "done" ? paymentDetails(o) : '')+recordActions(o)+'<div class="footer"><div class="buttons">'+action+'</div></div></article>';
+    return '<article data-order-id="'+esc(o.id)+'" class="order '+queueClass+'"><div class="order-top"><div><div class="id">'+esc(o.orderCode || o.id)+' · '+date(o.created)+' '+serviceBadge+'</div>'+itinerary+'<div class="order-store">'+clientLine+'</div></div><div style="text-align:right"><span class="tag '+tag+'">'+st+'</span><div class="fee">'+(o.status==="cotacao"?"A definir":cash(o.fee))+'</div></div></div>'+queueBadge+estimates+'<div class="meta"><span>📅 Data: '+esc(formatServiceDate(o.serviceDate))+'</span><span>🔧 Serviço: '+esc(serviceTypeLabel(o.serviceType))+'</span><span>🏪 Loja: '+esc(o.storeName)+'</span><span>♙ Motoboy: '+esc(o.courierName||"Aguardando")+'</span>'+' '+creationTimerHtml+' '+pickupTimerHtml+' '+runDurationHtml+'</div>'+returnHtml+careDetails(o)+trackingShareHtml+bidsHtml+gpsTrackingInfo+(o.status === "done" ? paymentDetails(o) : '')+recordActions(o)+'<div class="footer"><div class="buttons">'+action+'</div></div></article>';
   }
 
   function render(){
@@ -1972,6 +2033,13 @@
       return;
     }
     const adminTeamOpen=document.getElementById('admin-team')?.open===true;
+    const activity = document.getElementById('recent-activity');
+    const activityState = activity ? {
+      search: activity.querySelector('#activity-search').value,
+      status: activity.querySelector('#activity-status').value,
+      expanded: new Set(Array.from(activity.querySelectorAll('details[open]'), item => item.dataset.order)),
+      focus: activity.contains(document.activeElement) ? document.activeElement.id : ''
+    } : null;
     const drafts=Array.from(document.querySelectorAll('#tariff-form[data-dirty],#rain-form[data-dirty],#offer-settings-form[data-dirty],#admin-filter-form[data-dirty],#store-profile-form[data-dirty],#pix-profile-form[data-dirty],#city-config-form[data-dirty],#external-auto-call-form[data-dirty]')).map(form=>({id:form.id,version:form.dataset.baseVersion,fields:Array.from(form.querySelectorAll('input,select,textarea')).map((el,index)=>({index,value:el.type==='checkbox'?el.checked:el.value})),focus:form.contains(document.activeElement)?document.activeElement.id:null}));
     let label = role === "store" ? "Lojista" : role === "courier" ? "Motoboy" : "Administrador";
     let people = role === "store" ? data.stores : role === "courier" ? data.couriers : [{id:"admin",name:"Administrador"}];
@@ -2010,6 +2078,14 @@
     const tutorialButton='<button type="button" data-action="open-tutorial"><span>?</span><b>Tutorial do perfil</b><small>Rever os primeiros passos</small></button>';
     const quickActions = role !== 'admin' ? '<details class="quick-controls browser-preferences" data-browser-preferences><summary>⚙ Preferências e informações</summary><div class="quick-grid">'+tutorialButton+'<button type="button" data-nav="tariffs"><span>R$</span><b>Tarifas e avisos</b><small>Valores em vigor</small></button><button type="button" data-action="push-settings"><span>♬</span><b>Notificações e som</b><small>Ativar e testar</small></button>'+(role==='courier'?'<button type="button" data-nav="profile"><span>◇</span><b>Meu Pix</b><small>Dados para recebimento</small></button><button type="button" data-action="signal-rain"><span>☂</span><b>Sinalizar chuva</b><small>Avisar o administrador</small></button>':'')+'</div></details>' : '<details class="quick-controls browser-preferences"><summary>Ajuda e informações</summary><div class="quick-grid">'+tutorialButton+'</div></details>';
     document.getElementById("content").innerHTML = availabilityPanel + tariffBanner + tutorialContent() + paymentNotice + overdueNotice + show() + quickActions;
+    const updatedActivity = document.getElementById('recent-activity');
+    if (updatedActivity && activityState) {
+      updatedActivity.querySelector('#activity-search').value = activityState.search;
+      updatedActivity.querySelector('#activity-status').value = activityState.status;
+      for (const row of updatedActivity.querySelectorAll('.activity-row')) row.open = activityState.expanded.has(row.dataset.order);
+      filterActivity(updatedActivity);
+      if (activityState.focus) document.getElementById(activityState.focus)?.focus({ preventScroll: true });
+    }
     const storeProfileForm = document.getElementById("store-profile-form");
     const storeProfileDraft = currentUser?.uid && storeProfileDrafts.get(currentUser.uid);
     if (storeProfileForm && storeProfileDraft) {
@@ -2351,6 +2427,79 @@
     return '<section class="panel" id="admin-order-detail" style="margin-top:14px;border:2px solid #CBD5E1;overflow-wrap:anywhere"><h2>Detalhes · '+esc(order.orderCode||order.id)+'</h2><p>'+esc(adminStatus(order))+' · '+(order.status==='cotacao'?'A definir':cash(order.fee))+'</p>'+(outside?'<p>Este pedido está fora dos filtros atuais. Os detalhes continuam acompanhando as atualizações.</p>':'')+details.filter(([,v])=>v).map(([label,value])=>'<p><b>'+label+':</b> '+esc(value)+'</p>').join('')+milestones.filter(([,v])=>v).map(([label,value])=>'<p><b>'+label+':</b> '+esc(adminTime(value))+'</p>').join('')+(order.cancellationReason?'<p><b>Motivo:</b> '+esc(order.cancellationReason)+'</p>':'')+(order.priceSnapshot?'<p>Tarifa registrada em '+esc(adminTime(order.priceSnapshot.calculatedAt))+'. Adicional de chuva registrado: '+cash(order.priceSnapshot.rainFee||0)+'.</p>':'<p>Registro anterior: valor já gravado preservado.</p>')+(order.status==='done'&&p.paymentState(order)==='confirmed'&&!order.paymentConfirmedAt?'<p>Pagamento já marcado no histórico anterior, sem horário adicional de confirmação registrado.</p>':'')+(order.status==='run'&&t.validLocation(order.location,Date.now())?'<p>GPS recebido em '+esc(adminTime(order.location.updatedAt))+'</p><a class="btn secondary tiny" target="_blank" rel="noopener noreferrer" href="https://www.openstreetmap.org/?mlat='+order.location.lat+'&mlon='+order.location.lng+'#map=16/'+order.location.lat+'/'+order.location.lng+'">Abrir última posição no mapa</a>':'')+'<p>Consulta administrativa. Pagamento continua sendo informado pela loja e confirmado pelo motoboy.</p><button type="button" class="btn secondary tiny" data-action="admin-close-detail">Fechar detalhes</button></section>';
   }
 
+  function normalizeActivity(text) {
+    return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR');
+  }
+
+  function filterActivity(section) {
+    const query = normalizeActivity(section.querySelector('#activity-search').value.trim());
+    const status = section.querySelector('#activity-status').value;
+    let count = 0;
+    for (const group of section.querySelectorAll('.activity-day')) {
+      let visible = 0;
+      for (const row of group.querySelectorAll('.activity-row')) {
+        row.hidden = !row.dataset.search.includes(query) || Boolean(status && status !== row.dataset.status);
+        if (!row.hidden) visible++;
+      }
+      group.hidden = visible === 0;
+      count += visible;
+    }
+    section.querySelector('output').textContent = count;
+    section.querySelector('.activity-empty').hidden = count !== 0;
+  }
+
+  const contentRoot = document.getElementById('content');
+  for (const eventName of ['input', 'change']) {
+    contentRoot.addEventListener(eventName, event => {
+      if (event.target.matches('#activity-search, #activity-status')) {
+        filterActivity(event.target.closest('#recent-activity'));
+      }
+    });
+  }
+
+  function recentActivity(orders) {
+    const dayFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
+    const timeFormat = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' });
+    const timestamp = order => {
+      const value = Number(order.completed || order.cancelledAt || order.created);
+      return Number.isFinite(value) && value > 0 && value <= 8.64e15 ? value : 0;
+    };
+    const history = orders.filter(order => ['done', 'cancelled', 'cancelado_cotacao', 'route_done', 'route_cancelled'].includes(order.status))
+      .sort((a, b) => timestamp(b) - timestamp(a));
+    const groups = new Map();
+    for (const order of history) {
+      const at = timestamp(order);
+      const day = at ? dayFormat.format(at) : 'Data indisponível';
+      if (!groups.has(day)) groups.set(day, []);
+      groups.get(day).push(order);
+    }
+    const rows = Array.from(groups, ([day, entries]) => {
+      const cards = entries.map(order => {
+        const finished = order.status === 'done' || order.status === 'route_done';
+        const code = order.orderCode || order.id;
+        const label = order.client || order.clientNeighborhood || (order.kind === 'route' ? 'Rota múltipla' : 'Entrega');
+        const search = normalizeActivity([code, label, order.address, order.clientNeighborhood, order.courierName].filter(Boolean).join(' '));
+        const time = timestamp(order) ? ' · ' + timeFormat.format(timestamp(order)) : '';
+        const payment = order.status === 'done' && !order.paid ? '<span class="tag orange">Pagamento pendente</span>' : '';
+        return `<details class="activity-row" data-order="${esc(order.id)}" data-search="${esc(search)}" data-status="${finished ? 'done' : 'cancelled'}">
+          <summary><span class="activity-label"><b>${esc(code)}</b><small>${esc(label + time)}</small></span>
+          <span class="activity-badges"><span class="tag ${finished ? 'green' : 'gray'}">${finished ? 'Concluído' : 'Cancelado'}</span>${payment}</span></summary>
+          ${card(order)}
+        </details>`;
+      }).join('');
+      return `<section class="activity-day"><h3>${esc(day)}</h3>${cards}</section>`;
+    }).join('');
+    return `<section id="recent-activity" class="panel dashboard-section" aria-labelledby="recent-activity-title">
+      <div class="panel-head"><h2 id="recent-activity-title">Atividade recente</h2><output class="section-count" aria-label="Resultados">${history.length}</output></div>
+      <div class="activity-filters">
+        <div class="field"><label for="activity-search">Buscar pedido</label><input id="activity-search" type="search" placeholder="Código, cliente ou bairro"></div>
+        <div class="field"><label for="activity-status">Situação</label><select id="activity-status"><option value="">Todos</option><option value="done">Concluídos</option><option value="cancelled">Cancelados</option></select></div>
+      </div>
+      ${rows}
+      <p class="empty activity-empty" ${history.length ? 'hidden' : ''}>Nenhum pedido para exibir.</p>
+    </section>`;
+  }
+
   function dashboard(){
     const os=mine().filter(operational);
     const op=os.filter(o=>["open","route_open","return_priority"].includes(o.status));
@@ -2365,9 +2514,8 @@
     }
     const stats=stat("Em execução",run.length,"Corridas ativas","◷")+stat("Em aberto",op.length,"Aguardando motoboy","＋")+stat("Aguardando cotação",quotes.length,"Propostas pendentes","💬")+stat("Não acertados",unpaid.length,cash(unpaid.reduce((n,o)=>n+Number(o.fee||0),0)),"R$");
     const section=(title,list,emptyTitle,emptyText)=>!list.length?'':'<section class="panel dashboard-section"><div class="panel-head"><h2>'+title+'</h2><span class="section-count">'+list.length+'</span></div>'+(list.length?'<div class="list">'+list.map(card).join("")+'</div>':empty(emptyTitle,emptyText))+'</section>';
-    const recent=os.filter(o=>["done","cancelled","cancelado_cotacao","route_done","route_cancelled"].includes(o.status)).slice().sort((a,b)=>Number(b.completed||b.cancelledAt||b.created||0)-Number(a.completed||a.cancelledAt||a.created||0)).slice(0,5);
     const actions=role==="store"?'<div class="dashboard-actions"><button type="button" class="btn primary" data-open-sheet data-sheet-mode="delivery">＋ Pedir motoboy</button><button type="button" class="btn secondary" data-open-sheet data-sheet-mode="quote">💬 Pedir cotação</button></div>':"";
-    return storeProfileWarning+'<div class="head"><div><h1>Olá, '+esc((person()||{name:"Admin"}).name.split(" ")[0])+'</h1><p>Prioridade para o que precisa de atenção agora.</p></div>'+actions+'</div><div class="grid stats">'+stats+'</div>'+(role==="store"?section("Em execução",run.sort((a,b)=>Number(b.accepted||0)-Number(a.accepted||0)),"Nenhuma corrida em execução","As corridas aceitas aparecerão aqui.")+section("Em aberto",op.sort((a,b)=>Number(a.created||0)-Number(b.created||0)),"Nenhum pedido em aberto","Os pedidos aguardando motoboy aparecerão aqui.")+section("Aguardando devolução",os.filter(o=>["awaiting_return","awaiting_quote_return"].includes(o.status)),"Nenhuma devolução pendente","As devoluções aguardando liberação aparecerão aqui.")+section("Aguardando cotação",quotes.sort((a,b)=>Number(b.created||0)-Number(a.created||0)),"Nenhuma cotação pendente","As propostas especiais aparecerão aqui."):"")+section("Atividade recente",recent,"Sem atividade recente","Os últimos pedidos aparecerão aqui.");
+    return storeProfileWarning+'<div class="head store-overview"><div><h1>Olá, '+esc((person()||{name:"Admin"}).name.split(" ")[0])+'</h1><p>Prioridade para o que precisa de atenção agora.</p></div>'+actions+'</div><div class="grid stats">'+stats+'</div>'+(role==="store"?section("Em execução",run.sort((a,b)=>Number(b.accepted||0)-Number(a.accepted||0)),"Nenhuma corrida em execução","As corridas aceitas aparecerão aqui.")+section("Em aberto",op.sort((a,b)=>Number(a.created||0)-Number(b.created||0)),"Nenhum pedido em aberto","Os pedidos aguardando motoboy aparecerão aqui.")+section("Aguardando devolução",os.filter(o=>["awaiting_return","awaiting_quote_return"].includes(o.status)),"Nenhuma devolução pendente","As devoluções aguardando liberação aparecerão aqui.")+section("Aguardando cotação",quotes.sort((a,b)=>Number(b.created||0)-Number(a.created||0)),"Nenhuma cotação pendente","As propostas especiais aparecerão aqui."):"")+recentActivity(os);
   }
 
   // Atualiza a idade e a prioridade da fila mesmo sem novas alterações no Firebase.
