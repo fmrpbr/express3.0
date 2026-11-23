@@ -1,0 +1,759 @@
+const { test, expect } = require('@playwright/test');
+const admin = require('../../functions/node_modules/firebase-admin');
+let app, db;
+const base='http://127.0.0.1:8080/www/';
+test.beforeAll(async()=>{
+  app=admin.initializeApp({projectId:'demo-express-entregas-browser',databaseURL:'https://demo-express-entregas-browser-default-rtdb.firebaseio.com'},'browser');db=app.database();
+  await db.ref().set(null);
+});
+test.afterAll(async()=>{await app.delete();});
+async function register(page,role,email){
+  await page.goto(base);
+  if(role==='courier') await page.locator('#btn-login-courier').click();
+  await page.locator('#tab-register').click();
+  await page.locator('#auth-name').fill(role==='courier'?'Motoboy Teste':'Loja Teste');
+  await page.locator('#auth-extra').fill('27999999999');
+  await page.locator('#auth-email').fill(email);
+  await page.locator('#auth-password').fill('test-password-123');
+  await page.locator('#auth-submit-btn').click();
+  await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
+  await expect(page.getByRole('heading',{name:'Cadastro aguardando aprovação'})).toBeVisible();
+  const user=await app.auth().getUserByEmail(email);
+  await db.ref('profiles/'+(role==='store'?'stores/':'couriers/')+user.uid+'/accessStatus').set('approved');
+  await expect(page.getByRole('heading',{name:'Cadastro aguardando aprovação'})).toHaveCount(0);
+}
+let clientSerial=10000000;
+test('administrador ajusta as rodadas de oferta pela tela de homologação',async({browser})=>{
+  const email='admin-offers-'+Date.now()+'@example.test',password='test-password-123';
+  const account=await app.auth().createUser({email,password});
+  await app.auth().setCustomUserClaims(account.uid,{admin:true});
+  const page=await browser.newPage();
+  await page.goto(base);await page.locator('#admin-entry-button').click();
+  await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
+  await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
+  await page.locator('#nav [data-nav=offers]').click();
+  await expect(page.locator('#content h1')).toHaveText('Distribuição de ofertas');
+  await page.locator('#offers-enabled').check();await page.locator('#offers-couriers').fill('2');
+  await page.locator('#offers-seconds').fill('45');await page.locator('#offers-rounds').fill('2');
+  await page.locator('#offer-settings-form button[type=submit]').click();
+  await expect(page.locator('#offers-seconds')).toHaveValue('45');
+  const settings=(await db.ref('config/offerDistribution').get()).val();
+  expect(settings).toMatchObject({enabled:true,couriersPerRound:2,responseSeconds:45,maxRounds:2});
+  await page.close();
+});
+test('admin cadastra e pausa cidade sem alterar as tarifas legadas',async({browser})=>{
+  const email='admin-cities-'+Date.now()+'@example.test',password='test-password-123';
+  const account=await app.auth().createUser({email,password});
+  await app.auth().setCustomUserClaims(account.uid,{admin:true});
+  const page=await browser.newPage();
+  try{
+    await page.goto(base);await page.locator('#admin-entry-button').click();
+    await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
+    await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
+    await page.locator('#nav [data-nav=cities]').click();
+    await page.locator('#city-name').fill('Vila Velha');await page.locator('#city-base-fee').fill('18.50');await page.locator('#city-neighborhood-rates').fill('Centro = 21,50\nPraia da Costa = 25.00');
+    expect(await page.locator('#city-config-form').evaluate(form=>form.checkValidity())).toBe(true);
+    await page.locator('#city-config-form button[type=submit]').click();
+    await expect(page.locator('#content')).toContainText('Vila Velha');
+    const cities=(await db.ref('config/cities').get()).val();
+    expect(cities['vila-velha']).toMatchObject({name:'Vila Velha',enabled:true,rates:{sedeDay:18.5,zones:{'Sede e Bairros (Padrão)':18.5,'Centro':21.5,'Praia da Costa':25}}});
+    await page.locator('[data-action=city-toggle][data-id="vila-velha"]').click();
+    await page.getByRole('dialog',{name:'Pausar cidade'}).locator('[data-decision=confirm]').click();
+    await expect(page.locator('#content')).toContainText('PAUSADA');
+    expect((await db.ref('config/cities/vila-velha/enabled').get()).val()).toBe(false);
+    expect((await db.ref('config/tariffPlans').get()).val()).toBeNull();
+    await page.locator('#nav [data-nav=integrations]').click();
+    await expect(page.locator('#content')).toContainText('ADAPTER NÃO IMPLEMENTADO');
+    await expect(page.locator('#content .registry-entry')).toHaveCount(3);
+  }finally{
+    await page.close();await db.ref('config/cities/vila-velha').remove();
+  }
+});
+test('motoboy recebe oferta privada, pode recusar sem punição e depois aceitar outra', {timeout:180000},async({browser})=>{
+  const storeContext=await browser.newContext({viewport:{width:393,height:852}}),courierContext=await browser.newContext({viewport:{width:393,height:852}});
+  const store=await storeContext.newPage(),courier=await courierContext.newPage();
+  const storeEmail='offer-store-'+Date.now()+'@example.test',courierEmail='offer-courier-'+Date.now()+'@example.test';
+  try{
+    await db.ref('config/offerDistribution').set({enabled:true,couriersPerRound:3,responseSeconds:30,maxRounds:3});
+    await register(store,'store',storeEmail);
+    await store.evaluate(()=>window.__express.setView('profile'));
+    await store.locator('#prof-address').fill('Rua da Loja, 1, Centro');await store.locator('#store-profile-form button[type=submit]').click();
+    await expect(store.locator('#prof-address')).toHaveCount(0);
+    await register(courier,'courier',courierEmail);
+    const courierUid=(await app.auth().getUserByEmail(courierEmail)).uid;
+    await preferences(courier);await courier.locator('[data-toggle-availability]').click();
+    await expect(courier.locator('[data-toggle-availability]')).toHaveText('PAUSAR');
+    await courier.evaluate(()=>window.__express.setView('available'));
+    await expect.poll(async()=>Object.values((await db.ref('courierConnections/'+courierUid).get()).val()||{}).some(s=>Number(s.lastSeen)>0)).toBe(true);
+    const createOrder=async(label)=>{
+      await store.locator('[data-open-sheet]').first().click();
+      await beginCustomer(store);await store.locator('#inp-client').fill(label);await store.locator('#inp-street').fill('Rua do Cliente');
+      await store.locator('#inp-number').fill('42');await store.locator('#input-neighborhood').fill('Centro');await store.locator('#quote-city').fill('Aracruz');
+      await store.locator('#zone-select-mobile').selectOption('Shopping Oriundi');await confirmCustomer(store);
+      await store.locator('#btn-submit-order').click();await expect(store.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+      const orders=(await db.ref('orders').get()).val()||{};return Object.entries(orders).find(([,order])=>order.client===label)?.[0];
+    };
+    const declinedId=await createOrder('CLIENTE RECUSOU');
+    await expect.poll(async()=>(await db.ref(`courierOffers/${courierUid}/${declinedId}`).get()).val()?.offerStatus).toBe('pending');
+    await expect(courier.locator(`[data-order-id="${declinedId}"] [data-action="decline-offer"]`)).toBeVisible();
+    courier.on('dialog',dialog=>dialog.accept('Sem disponibilidade'));
+    await courier.locator(`[data-order-id="${declinedId}"] [data-action="decline-offer"]`).click();
+    await expect.poll(async()=>(await db.ref(`courierOffers/${courierUid}/${declinedId}`).get()).val()?.offerStatus).toBe('declined');
+    expect((await db.ref(`courierOffers/${courierUid}/${declinedId}`).get()).val().declineReason).toBe('Sem disponibilidade');
+    expect((await db.ref(`courierPresence/${courierUid}/availableForWork`).get()).val()).toBe(true);
+    const acceptedId=await createOrder('CLIENTE ACEITOU');
+    await expect.poll(async()=>(await db.ref(`courierOffers/${courierUid}/${acceptedId}`).get()).val()?.offerStatus).toBe('pending');
+    await courier.locator(`[data-order-id="${acceptedId}"] [data-action="accept"]`).click();
+    await expect.poll(async()=>(await db.ref(`orders/${acceptedId}/status`).get()).val()).toBe('run');
+  }finally{
+    await storeContext.close();await courierContext.close();await db.ref().set(null);
+  }
+});
+test('tutorial inicial é específico do perfil e pode ser aberto de novo',async({page})=>{
+  const email='tutorial-'+Date.now()+'@example.test';await register(page,'store',email);
+  await expect(page.locator('.v3-tutorial')).toContainText('Complete o endereço e o WhatsApp da loja');
+  await page.locator('[data-action=complete-tutorial]').click();await expect(page.locator('.v3-tutorial')).toHaveCount(0);
+  await preferences(page);await page.locator('[data-action=open-tutorial]').click();
+  await expect(page.locator('.v3-tutorial')).toContainText('Acompanhe aceite e retirada');
+  await page.locator('[data-action=complete-tutorial]').click();
+});
+async function beginCustomer(page){
+  await page.locator('#inp-phone').fill('279'+String(++clientSerial));
+  await expect(page.locator('[data-phone-status]')).toContainText('Cliente novo');
+}
+async function confirmCustomer(page){
+  if(await page.locator('#phone-customer-panel').isVisible())await page.locator('[data-phone-confirm]').click();
+}
+async function preferences(page){
+  const node=page.locator('[data-browser-preferences]');
+  if(await node.count() && !(await node.getAttribute('open')!==null))await node.locator('summary').click();
+}
+test('cadastro mobile, perfil, pedido, aceite, retirada, conclusão e pagamento sincronizado',async({browser})=>{
+  test.setTimeout(150000);
+  const storeContext=await browser.newContext({viewport:{width:393,height:852}});
+  const courierContext=await browser.newContext({viewport:{width:393,height:852}});
+  const store=await storeContext.newPage(),courier=await courierContext.newPage();
+  const errors=[]; for(const page of [store,courier]) page.on('pageerror',error=>errors.push(error.message));
+  await register(store,'store','store-'+Date.now()+'@example.test');
+  await store.evaluate(()=>window.__express.setView('profile'));
+  await expect(store.locator('#external-auto-call-form [data-provider]')).toHaveCount(3);
+  await expect(store.locator('#external-auto-call-form [data-provider]:not(:checked)')).toHaveCount(3);
+  await expect(store.locator('#external-auto-call-form [data-provider]:disabled')).toHaveCount(3);
+  await store.locator('#prof-address').fill('Rua da Loja, 1, Centro');
+  await store.evaluate(()=>window.__express.setView('profile'));
+  await expect(store.locator('#prof-address')).toHaveValue('RUA DA LOJA, 1, CENTRO');
+  await store.locator('#store-profile-form button[type=submit]').click();
+  await expect(store.locator('#prof-address')).toHaveCount(0);
+  await register(courier,'courier','courier-'+Date.now()+'@example.test');
+  await preferences(courier);await courier.locator('[data-nav=profile]').filter({hasText:'Meu Pix'}).click();
+  await courier.locator('#pix-type').selectOption('email');
+  await courier.locator('#pix-key').fill('Moto.Pix@Example.com');
+  await expect(courier.locator('#pix-key')).toHaveValue('Moto.Pix@Example.com');
+  await courier.locator('#pix-holder').fill('Titular Teste');
+  await courier.locator('#pix-profile-form button[type=submit]').click();
+  await expect(courier.locator('#pix-profile-form')).toHaveCount(0);
+  await courier.evaluate(()=>window.__express.setView('available'));
+  await courier.locator('[data-toggle-availability]').click();
+  await expect(courier.locator('[data-toggle-availability]')).toHaveText('PAUSAR');
+  await preferences(courier);await courier.locator('[data-action=push-settings]').click();
+  await expect(courier.locator('dialog')).toBeVisible();
+  await courier.locator('dialog [name=reminders]').uncheck();
+  await courier.locator('dialog button[type=submit]').click();
+  await expect(courier.locator('dialog')).toHaveCount(0);
+  await store.locator('[data-open-sheet][data-sheet-mode=delivery]').first().click();
+  await expect(store.locator('#service-type-select')).toHaveValue('delivery');
+  await beginCustomer(store);await store.locator('#inp-client').fill('Cliente de Teste');
+  await store.locator('#inp-street').fill('Rua Particular');
+  await store.locator('#inp-number').fill('42');
+  await store.locator('#input-neighborhood').fill('Centro');
+  await store.locator('#quote-city').fill('Aracruz');
+  await store.locator('#zone-select-mobile').selectOption('Shopping Oriundi');
+  await store.locator('#chk-bag-mob').check();
+  await expect(store.locator('#zone-select-mobile')).toHaveValue('Shopping Oriundi');
+  await confirmCustomer(store);await store.locator('#btn-submit-order').click();
+  await expect(store.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  await store.locator('[data-action=share-whatsapp]').click();
+  await expect(store.getByRole('dialog',{name:'Prévia da mensagem do WhatsApp'})).toBeVisible();
+  await expect(store.locator('dialog [name=message]')).toHaveValue(/https:\/\//);
+  await store.locator('dialog [data-record-cancel]').click();
+  await expect(courier.locator('[data-action=accept]')).toHaveCount(1);
+  await expect(courier.locator('#content')).not.toContainText('RUA PARTICULAR');
+  courier.on('dialog',d=>d.dismiss());
+  await courier.locator('[data-action=accept]').click();
+  await expect(courier.locator('[data-action=picked]')).toHaveCount(1);
+  await expect(courier.locator('[data-work-status]')).toHaveText('OCUPADO');
+  await expect(courier.locator('#hero-busy')).toHaveText('1');
+  await expect(courier.locator('#hero-available')).toHaveText('0');
+  await store.locator('#nav [data-nav=run]').click();
+  await expect(store.locator('#page-title')).toHaveText('Em execução');
+  await expect(store.locator('[data-order-id]')).toHaveCount(1);
+
+  await expect(courier.locator('#content')).toContainText('RUA PARTICULAR');
+  await courier.locator('[data-action=picked]').click();
+  const runningOrder=Object.entries((await db.ref('orders').get()).val()).find(([,o])=>o.status==='run');
+  const deliveredOrderId=runningOrder[0];
+  await courier.locator(`[data-order-id="${deliveredOrderId}"] [data-action=report-occurrence]`).click();
+  await courier.getByRole('dialog',{name:'Relatar ocorrência'}).locator('[name=kind]').selectOption('delay');
+  await courier.getByRole('dialog',{name:'Relatar ocorrência'}).locator('textarea[name=description]').fill('Acesso temporariamente bloqueado.');
+  await courier.getByRole('dialog',{name:'Relatar ocorrência'}).locator('button[type=submit]').click();
+  await expect.poll(async()=>Number((await db.ref(`orders/${deliveredOrderId}/openOccurrenceCount`).get()).val())).toBe(1);
+  await expect(courier.locator('[data-action=finish]')).toHaveCount(1);
+  await courier.locator('[data-action=finish]').click();
+  await expect(courier.locator('[data-action=confirm-payment]')).toHaveCount(0);
+  await expect(courier.locator('[data-work-status]')).toHaveText('DISPONÍVEL');
+  await expect(courier.locator('#content')).toContainText('Aguardando lojista informar pagamento');
+  const [completedId, completedOrder] = Object.entries((await db.ref('orders').get()).val()).find(([,o])=>o.status==='done');
+  await courier.evaluate(()=>window.__express.setView('done'));
+  await courier.locator(`[data-order-id="${completedId}"] [data-action=register-proof]`).click();
+  const proofDialog=courier.getByRole('dialog',{name:'Comprovante digital'});await proofDialog.locator('[name=recipient]').fill('Pessoa Recebedora');
+  const signature=proofDialog.locator('canvas'),signatureBox=await signature.boundingBox();
+  await courier.mouse.move(signatureBox.x+10,signatureBox.y+70);await courier.mouse.down();await courier.mouse.move(signatureBox.x+120,signatureBox.y+50,{steps:4});await courier.mouse.move(signatureBox.x+240,signatureBox.y+80,{steps:4});await courier.mouse.up();
+  await proofDialog.locator('button[type=submit]').click();
+  await expect.poll(async()=>(await db.ref(`deliveryProofs/${completedId}`).get()).val()?.recipientName).toBe('PESSOA RECEBEDORA');
+  await store.evaluate(()=>window.__express.setView('done'));
+  const storeRating=store.locator(`[data-order-id="${completedId}"] [data-action=rate-delivery]`);
+  await storeRating.click();let ratingDialog=store.getByRole('dialog',{name:'Avaliar a entrega'});await ratingDialog.locator('[name=score]').selectOption('5');await ratingDialog.locator('[name=note]').fill('Entrega no prazo.');await ratingDialog.locator('button[type=submit]').click();
+  await courier.locator(`[data-order-id="${completedId}"] [data-action=rate-delivery]`).click();ratingDialog=courier.getByRole('dialog',{name:'Avaliar a entrega'});await ratingDialog.locator('[name=score]').selectOption('4');await ratingDialog.locator('button[type=submit]').click();
+  await expect.poll(async()=>(await db.ref(`orders/${completedId}/ratingStatus/courierSubmitted`).get()).val()).toBe(true);
+  const previousDay = { ...completedOrder, completed: Date.now()-2*86400000, revision: Number(completedOrder.revision||0)+1 };
+  await db.ref().update({ ['orders/'+completedId]:previousDay, ['storeOrders/'+completedOrder.storeId+'/'+completedId]:previousDay, ['courierOrders/'+completedOrder.courierId+'/'+completedId]:previousDay });
+  await expect.poll(async()=>(await db.ref(`courierOrders/${completedOrder.courierId}/${completedId}/completed`).get()).val()).toBe(previousDay.completed);
+  await courier.reload();await expect(courier.locator('#login-screen')).toBeHidden();await courier.evaluate(()=>window.__express.setView('done'));
+  await expect(courier.locator('#content')).toContainText('Pendência de dia anterior');
+  await store.reload();await expect(store.locator('#login-screen')).toBeHidden();await store.evaluate(()=>window.__express.setView('done'));
+  await expect(store.locator('#content')).toContainText('pendência(s) de dias anteriores');
+  await expect(store.locator('#content')).toContainText('moto.pix@example.com');
+  await storeContext.grantPermissions(['clipboard-read','clipboard-write']);
+  await store.locator('[data-action=copy-pix]').click();
+  expect(await store.evaluate(()=>navigator.clipboard.readText())).toBe('moto.pix@example.com');
+  store.on('dialog', d=>d.accept());
+  await store.locator('[data-action=report-payment]').click();
+  await expect(store.getByRole('dialog',{name:'Informar pagamento'})).toBeVisible();
+  await store.locator('[data-decision=confirm]').click();
+  await expect(store.locator('#content')).toContainText('Aguardando confirmação do motoboy');
+  await expect(courier.locator('[data-action=confirm-payment]')).toHaveCount(1);
+  await expect(courier.locator('#content')).toContainText('pagamento(s) para conferir');
+  await courier.reload();
+  await expect(courier.locator('#login-screen')).toBeHidden();
+  await courier.locator('[data-nav=reports]').filter({hasText:'Conferir pagamentos'}).click();
+  await expect(courier.locator('#content')).toContainText('Pendências por dia e lojista');
+  await expect(courier.locator('[data-action=confirm-payment]')).toHaveCount(1);
+  courier.removeAllListeners('dialog'); courier.on('dialog',d=>d.accept());
+  await courier.locator('[data-action=confirm-payment]').click();
+  await courier.locator('[data-decision=confirm]').click();
+  await expect(store.locator('#content')).toContainText('Pagamento confirmado');
+  await expect(courier.locator('#content')).toContainText('Histórico de pagamentos confirmados');
+  await expect(courier.locator('[data-action=confirm-payment]')).toHaveCount(0);
+  expect(errors).toEqual([]);
+  for(const page of [store,courier]) {
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect(await page.locator('#nav').evaluate(nav=>nav.scrollWidth<=nav.clientWidth)).toBe(true);
+  }
+  await storeContext.close();await courierContext.close();
+});
+test('visitante abre rastreio sem login, recebe atualização e perde acesso ao revogar',async({page})=>{
+  const token='b'.repeat(64);
+  await db.ref('publicTracking/'+token).set({orderCode:'EXP-TESTE',status:'open',serviceTypeLabel:'Entrega',expiresAt:Date.now()+600000,revoked:false,updatedAt:Date.now()});
+  await page.goto(base+'#track='+token);
+  await expect(page.locator('#public-track-content')).toContainText('Aguardando motoboy');
+  await db.ref('publicTracking/'+token).update({status:'run',location:{lat:-19.8,lng:-40.3,updatedAt:Date.now()}});
+  await expect(page.locator('#public-track-content')).toContainText('Em atendimento');
+  await db.ref('publicTracking/'+token).remove();
+  await expect(page.locator('#public-track-content')).toContainText(/encerrado|indisponível/);
+});
+test('cotação de duas viagens divide o total e libera o motoboy entre as etapas',async({browser})=>{
+  const sc=await browser.newContext({viewport:{width:393,height:852}}),cc=await browser.newContext({viewport:{width:393,height:852}});
+  const store=await sc.newPage(),courier=await cc.newPage();
+  store.on('dialog',d=>d.accept());courier.on('dialog',d=>d.dismiss());
+  await register(store,'store','quote-store-'+Date.now()+'@example.test');
+  await store.evaluate(()=>window.__express.setView('profile'));
+  await store.locator('#prof-address').fill('Rua da Loja, 10');
+  await store.locator('#store-profile-form button[type=submit]').click();
+  await expect(store.locator('#prof-address')).toHaveCount(0);
+  await register(courier,'courier','quote-courier-'+Date.now()+'@example.test');
+  await courier.locator('[data-toggle-availability]').click();
+  await expect(courier.locator('[data-toggle-availability]')).toHaveText('PAUSAR');
+  await store.locator('[data-open-sheet][data-sheet-mode=quote]').first().click();
+  await store.locator('#service-type-select').selectOption('roundtrip');
+  await store.locator('#quote-city').fill('Aracruz');
+  await store.locator('#input-neighborhood').fill('Centro');
+  await confirmCustomer(store);await store.locator('#btn-submit-order').click();
+  await expect(store.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  await courier.locator('[data-nav=quotes]').click();
+  await courier.locator('[id^=bid-input-]').fill('25');
+  await courier.locator('[data-action=send-bid]').click();
+  await expect(store.locator('[data-action=accept-bid]')).toHaveCount(1);
+  await store.locator('[data-action=accept-bid]').click();
+  await expect(store.locator('#order-sheet-overlay')).toHaveClass(/active/);
+  await expect(store.locator('#quote-price-mobile')).toContainText('R$ 25,00');
+  await beginCustomer(store);await store.locator('#inp-client').fill('Cliente da Cotação');
+  await store.locator('#inp-street').fill('Rua Cliente');
+  await store.locator('#inp-number').fill('20');await store.locator('#input-neighborhood').fill('Centro');
+  await confirmCustomer(store);await store.locator('#btn-submit-order').click();
+  await expect(store.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  await courier.locator('[data-nav=available]').click();
+  await courier.locator('[data-action=accept]').click();
+  await courier.locator('[data-action=picked]').click();
+  await courier.locator('[data-action=finish]').click();
+  await expect(courier.locator('[data-work-status]')).toHaveText('DISPONÍVEL');
+  await expect(courier.locator('.fee')).toHaveText('R$ 12,50');
+  await store.evaluate(()=>window.__express.setView('open'));
+  await store.locator('[data-action=requestReturn]').click();await store.locator('dialog [data-decision=confirm]').click();
+  await courier.locator('[data-nav=available]').click();await expect(courier.locator('#content')).toContainText('Prioridade do primeiro motoboy');
+  await courier.locator('[data-action=accept]').click();await courier.locator('[data-action=picked]').click();await courier.locator('[data-action=finish]').click();
+  await expect(courier.locator('.fee')).toHaveCount(2);
+  await courier.screenshot({path:'/tmp/express-v2-courier.png',fullPage:true});
+  await sc.close();await cc.close();
+});
+test('cadastro interrompido pode ser retomado com o mesmo e-mail sem perder a conta',async({page})=>{
+  await page.goto(base);
+  await page.locator('#tab-register').click();
+  await page.locator('#auth-name').fill('Conta Recuperada');
+  await page.locator('#auth-extra').fill('27999999999');
+  await page.locator('#auth-email').fill('recover-'+Date.now()+'@example.test');
+  await page.locator('#auth-password').fill('test-password-123');
+  await page.route('**/southamerica-east1/orderCommand',route=>route.fulfill({status:503,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:{status:'UNAVAILABLE',message:'Teste de indisponibilidade'}})}));
+  await page.locator('#auth-submit-btn').click();
+  await expect(page.locator('#auth-feedback')).toContainText('Teste de indisponibilidade');
+  await expect(page.locator('#auth-submit-btn')).toBeEnabled();
+  await page.unroute('**/southamerica-east1/orderCommand');
+  await page.locator('#auth-submit-btn').click();
+  await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
+  await expect(page.getByRole('heading',{name:'Cadastro aguardando aprovação'})).toBeVisible();
+  const recovered=await app.auth().getUserByEmail(await page.locator('#auth-email').inputValue());
+  expect((await db.ref('profiles/stores/'+recovered.uid+'/name').get()).val()).toBe('CONTA RECUPERADA');
+  expect((await db.ref('profiles/stores/'+recovered.uid+'/accessStatus').get()).val()).toBe('pending');
+});
+
+test('duas corridas organizadas, prioridade trocada e terceira bloqueada; lojista copia link público',async({browser})=>{
+  await db.ref().set(null);
+  const sc=await browser.newContext({viewport:{width:393,height:852},permissions:['clipboard-read','clipboard-write']});
+  const cc=await browser.newContext({viewport:{width:393,height:852}});
+  const store=await sc.newPage(), courier=await cc.newPage();
+  courier.on('dialog',d=>d.dismiss());
+  await register(store,'store','two-store-'+Date.now()+'@example.test');
+  await store.evaluate(()=>window.__express.setView('profile'));
+  await store.locator('#prof-address').fill('Rua da Loja, 10');
+  await store.locator('#store-profile-form button[type=submit]').click();
+  await expect(store.locator('#prof-address')).toHaveCount(0);
+  await register(courier,'courier','two-courier-'+Date.now()+'@example.test');
+  await courier.locator('[data-toggle-availability]').click();
+  await expect(courier.locator('[data-toggle-availability]')).toHaveText('PAUSAR');
+  for(let i=1;i<=3;i++){
+    await store.evaluate(()=>window.__express.setView('dashboard'));
+    await store.locator('[data-open-sheet][data-sheet-mode=delivery]').first().click();
+    await beginCustomer(store);await store.locator('#inp-client').fill('Cliente '+i);
+    await store.locator('#inp-street').fill('Rua Teste '+i);
+    await store.locator('#inp-number').fill(String(i));
+    await store.locator('#input-neighborhood').fill('Centro');
+    await store.locator('#quote-city').fill('Aracruz');
+    await confirmCustomer(store);await store.locator('#btn-submit-order').click();
+    await expect(store.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  }
+  await expect(courier.locator('[data-action=accept]')).toHaveCount(3);
+  await courier.locator('[data-action=accept]').first().click();
+  await expect(courier.locator('#content')).toContainText('1 · EM ATENDIMENTO');
+  await courier.locator('[data-nav=available]').click();
+  await courier.locator('[data-action=accept]').first().click();
+  await expect(courier.locator('#content')).toContainText('2 · PRÓXIMA ENTREGA');
+  await expect(courier.locator('#content')).toContainText('2/2 VAGAS OCUPADAS');
+  const next=courier.locator('[data-action=focus]');
+  const nextId=await next.getAttribute('data-id');
+  await next.click();
+  await expect(courier.locator('[data-order-id]').first()).toHaveAttribute('data-order-id',nextId);
+  await courier.reload();
+  await courier.locator('[data-nav=run]').click();
+  await expect(courier.locator('[data-order-id]').first()).toHaveAttribute('data-order-id',nextId);
+  await courier.locator('[data-nav=available]').click();
+  await expect(courier.locator('[data-action=accept]')).toHaveCount(0);
+  await expect(courier.locator('#content')).toContainText('2/2 vagas ocupadas');
+  await store.locator('[data-action=copy-tracking]').first().click();
+  await expect(store.locator('#toasts')).toContainText('Link copiado');
+  const link=await store.evaluate(()=>navigator.clipboard.readText());
+  expect(link).toMatch(/^https:\/\/express-v2-rastreio-fmrpbr\.web\.app\/rastreio\/#track=[a-f0-9]{64}$/);
+  await courier.locator('[data-nav=run]').click();
+  await courier.screenshot({path:'/tmp/express-v2-capacity.png',fullPage:true});
+  await sc.close();await cc.close();
+});
+test('página pública dedicada recebe posição da fila e GPS, expira e não pede login',async({page})=>{
+  const token='c'.repeat(64),root='publicTracking/'+token;
+  await db.ref(root).set({orderCode:'EXP-LIVE',status:'run',queuePosition:2,expiresAt:Date.now()+600000,revoked:false,location:{lat:-19.8,lng:-40.3,updatedAt:Date.now()}});
+  await page.goto('http://127.0.0.1:8080/rastreio/#track='+token);
+  await expect(page.locator('#status')).toHaveText('Você é a próxima entrega');
+  await expect(page.locator('#map')).toHaveAttribute('href',/query=-19.8,-40.3/);
+  await db.ref(root).update({queuePosition:1});
+  await expect(page.locator('#status')).toHaveText('Sua entrega está em atendimento');
+  await page.screenshot({path:'/tmp/express-tracking.png',fullPage:true});
+  await db.ref(root).remove();
+  await expect(page.locator('#status')).toContainText('encerrado');
+  await expect(page.locator('#map')).toBeHidden();
+  await expect(page.locator('#code')).toHaveText('');
+});
+test('admin agenda tabela, perfis recebem aviso, preços antigos permanecem e chuva exige decisão',async({browser})=>{
+  await db.ref().set(null);
+  const contexts=await Promise.all([1,2,3].map(()=>browser.newContext({viewport:{width:393,height:852}})));
+  const [ad,store,courier]=await Promise.all(contexts.map(c=>c.newPage()));
+  const email='admin-'+Date.now()+'@example.test';
+  const user=await app.auth().createUser({email,password:'test-password-123'});
+  await app.auth().setCustomUserClaims(user.uid,{admin:true});
+  await register(store,'store','tariff-store-'+Date.now()+'@example.test');
+  await store.evaluate(()=>window.__express.setView('profile'));
+  await store.locator('#prof-address').fill('RUA DA LOJA, 1');
+  await store.locator('#store-profile-form button[type=submit]').click();
+  await expect(store.locator('#prof-address')).toHaveCount(0);
+  await register(courier,'courier','tariff-courier-'+Date.now()+'@example.test');
+  await ad.goto(base);await ad.locator('#auth-email').fill(email);await ad.locator('#auth-password').fill('test-password-123');await ad.locator('[data-admin-login]').click();
+  await expect(ad.locator('#login-screen')).toBeHidden();
+  await ad.evaluate(()=>window.__express.setView('rates'));
+  await expect(ad.locator('#tariff-form [data-rate=sedeDay]')).toHaveValue('5');
+  await expect(ad.locator('#tariff-form [data-zone]')).toHaveCount(23);
+  await ad.locator('#tariff-form [data-rate=sedeDay]').fill('6');
+  await preferences(courier);await courier.locator('[data-action=signal-rain]').click();
+  await courier.locator('[data-decision=confirm]').click();
+  await expect(ad.locator('#content')).toContainText('1 motoboy(s)');
+  await expect(ad.locator('#tariff-form [data-rate=sedeDay]')).toHaveValue('6');
+  await ad.locator('#tariff-form [data-rate=sedeDay]').fill('5');
+  ad.on('dialog',d=>d.accept());
+  await ad.locator('#tariff-form button[type=submit]').click();
+  await expect(store.locator('#content')).toContainText('Novos valores de entrega agendados');
+  await expect(courier.locator('#hero-alert-track')).toContainText('Novos valores de entrega agendados');
+  const plans=(await db.ref('config/tariffPlans').get()).val();const planId=Object.keys(plans)[0];
+  await expect(ad.locator('[data-action=cancel-rates]')).toHaveCount(1);
+  await preferences(store);await store.locator('[data-nav=tariffs]').click();
+  await expect(store.locator('#content')).toContainText('Ver todos os valores desta versão');
+  await expect(store.locator('#tariff-form')).toHaveCount(0);
+  await ad.locator('#rain-form button[type=submit]').click();
+  await expect(courier.locator('#hero-alert-track')).toContainText('Mudança de chuva agendada');
+  await ad.locator('[data-action=cancel-rates]').click();
+  await expect(store.locator('#hero-alert-track')).toContainText('Alteração de tarifas cancelada');
+  expect((await db.ref('config/tariffPlans/'+planId).get()).exists()).toBe(true);
+  for(const page of [ad,store,courier])expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  for(const c of contexts)await c.close();
+});
+
+test('painel admin filtra, pagina, acompanha pagamentos e preserva detalhes sem permitir baixas',async({browser})=>{
+  await db.ref().set(null);
+  const now=Date.now(),email='ops-admin-'+now+'@example.test';
+  const user=await app.auth().createUser({email,password:'test-password-123'});
+  await app.auth().setCustomUserClaims(user.uid,{admin:true});
+  const baseOrder={storeId:'shopA',storeName:'LOJA A',courierId:'riderA',courierName:'MOTO A',serviceType:'delivery',fee:5,created:now,revision:1};
+  const orders={
+    runLate:{...baseOrder,orderCode:'EXP-ATRASO',status:'run',created:now-1800000,accepted:now-1560000,client:'<img src=x onerror="window.__leaked=true">',location:{lat:-19.8,lng:-40.2,updatedAt:now-300000}},
+    pending:{...baseOrder,orderCode:'EXP-PENDENTE',status:'done',created:now-86400000,completed:now-86400000},
+    reported:{...baseOrder,storeId:'shopB',storeName:'LOJA B',courierId:'riderB',orderCode:'EXP-INFORMADO',status:'done',fee:7,created:now-86400000,completed:now-86400000,paymentStatus:'reported'},
+    paid:{...baseOrder,orderCode:'EXP-PAGO',status:'done',fee:9,completed:now,paid:true},
+    cancelled:{...baseOrder,orderCode:'EXP-CANCELADO',status:'cancelled',fee:0},
+    reserve:{...baseOrder,courierId:'riderB',courierName:'MOTO B',orderCode:'COT-RESERVA',status:'cotacao_aceita'}
+  };
+  for(let i=0;i<21;i++)orders['open'+i]={...baseOrder,courierId:i===0?'riderA':null,courierName:i===0?'MOTO A':null,...(i===0?{assignedCourierId:'riderA'}:{}),orderCode:'EXP-ABERTO-'+i,status:'open',created:now-i};
+  await db.ref().set({orders,profiles:{stores:{shopA:{name:'LOJA A'},shopB:{name:'LOJA B'}},couriers:{riderA:{name:'MOTO A'},riderB:{name:'MOTO B'},riderC:{name:'MOTO C'},riderD:{name:'MOTO D'}}},courierPresence:{riderA:{availableForWork:true},riderB:{availableForWork:true},riderC:{availableForWork:false},riderD:{availableForWork:false}},courierConnections:{riderA:{s:{lastSeen:now}},riderB:{s:{lastSeen:now-100000}},riderD:{s:{lastSeen:now}}}});
+  const context=await browser.newContext({viewport:{width:393,height:852}}),page=await context.newPage();
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(base);await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill('test-password-123');await page.locator('[data-admin-login]').click();
+  await expect(page.locator('[data-admin-stat=orders-total] .stat-value')).toHaveText('27');
+  await expect(page.locator('[data-admin-stat=orders-open] .stat-value')).toHaveText('21');
+  await expect(page.locator('[data-admin-stat=finance-reported] .stat-value')).toContainText('7,00');
+  await expect(page.locator('[data-admin-stat=team-online] .stat-value')).toHaveText('2');
+  await expect(page.locator('[data-admin-stat=team-one] .stat-value')).toHaveText('1');
+  await expect(page.locator('[data-admin-stat=team-two] .stat-value')).toHaveText('1');
+  await expect(page.locator('[data-admin-order]')).toHaveCount(20);
+  await page.locator('[data-action=admin-page][data-id=next]').click();
+  await expect(page.locator('[data-admin-order]')).toHaveCount(7);
+  await page.locator('[data-action=admin-detail][data-id=runLate]').first().click();
+  await expect(page.locator('#admin-order-detail')).toContainText('<img src=x');
+  await expect(page.locator('#admin-order-detail img')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.__leaked)).toBeUndefined();
+  await expect(page.locator('#admin-order-detail [data-action=report-payment],#admin-order-detail [data-action=confirm-payment],#admin-order-detail [data-action=cancel]')).toHaveCount(0);
+  await db.ref('orders/runLate').update({picked:now,location:{lat:-19.8,lng:-40.2,updatedAt:now},revision:2});
+  await expect(page.locator('#admin-order-detail')).toContainText('Retirada registrada');
+  await expect(page.locator('#content')).not.toContainText('Retirada não registrada há 25 minutos ou mais');
+  await page.locator('#admin-store').selectOption('shopB');await page.locator('#admin-payment').selectOption('reported');
+  await page.locator('#admin-filter-form button[type=submit]').click();
+  await expect(page.locator('[data-admin-order]')).toHaveCount(1);
+  await expect(page.locator('[data-admin-order]')).toContainText('EXP-INFORMADO');
+  await db.ref('orders/reported').update({paid:true,paymentStatus:'confirmed',paymentConfirmedAt:now,revision:2});
+  await expect(page.locator('[data-admin-order]')).toHaveCount(0);
+  await expect(page.locator('#admin-payment')).toHaveValue('reported');
+  await page.locator('#admin-search').fill('RASCUNHO');
+  await db.ref('courierConnections/riderD/s').set({lastSeen:Date.now()});
+  await expect(page.locator('#admin-search')).toHaveValue('RASCUNHO');
+  await page.locator('[data-action=admin-reset]').click();
+  await expect(page.locator('[data-admin-stat=finance-reported] .stat-value')).toContainText('0,00');
+  await expect(page.locator('[data-admin-stat=finance-confirmed] .stat-value')).toContainText('16,00');
+  expect((await db.ref('orders/runLate/fee').get()).val()).toBe(5);
+  expect((await db.ref('orders/reported/paymentConfirmedBy').get()).val()).toBeNull();
+  expect(errors).toEqual([]);
+  for(const width of [320,393,480]){await page.setViewportSize({width,height:852});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  await context.close();
+});
+
+async function completePasswordReset(email,password,apiKey){
+  const list=await (await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-express-entregas-browser/oobCodes')).json();
+  const code=list.oobCodes.filter(c=>c.email===email&&c.requestType==='PASSWORD_RESET').at(-1);
+  expect(Boolean(code?.oobCode)).toBe(true);
+  // Simula apenas o formulário seguro do provedor, usando código do emulador.
+  // Nenhum link ou código real é solicitado, impresso ou armazenado pelo app.
+  const response=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:resetPassword?key='+encodeURIComponent(apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({oobCode:code.oobCode,newPassword:password})});
+  expect(response.status).toBe(200);
+}
+
+test('admin sem senha abre primeiro acesso, solicita link e entra após definir senha pelo provedor',async({page})=>{
+  const email='first-admin-'+Date.now()+'@example.test',password='nova-senha-admin-123';
+  const user=await app.auth().createUser({email});await app.auth().setCustomUserClaims(user.uid,{admin:true});
+  await page.goto(base);await page.locator('[data-admin-login]').click();
+  await expect(page.locator('#admin-login-panel')).toBeVisible();
+  await expect(page.locator('#auth-feedback')).toContainText('primeira senha');
+  await expect(page.locator('#tab-register')).toBeHidden();
+  await page.locator('[data-action=open-first-password]').click();
+  await expect(page.locator('#recovery-title')).toHaveText('Definir primeira senha');
+  await expect(page.locator('#auth-password')).toBeHidden();
+  await page.locator('#recovery-email').fill(email);
+  await page.locator('#recovery-submit').click();
+  await expect(page.locator('#recovery-feedback')).toHaveAttribute('data-state','success');
+  await expect(page.locator('#recovery-feedback')).toContainText('spam');
+  await completePasswordReset(email,password,await page.evaluate(()=>window.EXPRESS_FIREBASE_CONFIG.apiKey));
+  await page.locator('[data-action=recovery-back]').click();
+  await expect(page.locator('#auth-email')).toHaveValue(email);
+  await expect(page.locator('#admin-login-panel')).toBeVisible();
+  await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
+  await expect(page.locator('#login-screen')).toBeHidden();
+  await expect(page.locator('[data-admin-sync]')).toContainText('Conectado');
+  expect((await app.auth().getUser(user.uid)).customClaims.admin).toBe(true);
+  expect((await db.ref('profiles/stores/'+user.uid).get()).exists()).toBe(false);
+});
+
+test('recuperação troca a senha existente e não concede admin a uma loja',async({page})=>{
+  const email='reset-store-'+Date.now()+'@example.test',oldPassword='senha-anterior-123',newPassword='senha-recuperada-456';
+  const user=await app.auth().createUser({email,password:oldPassword});
+  await db.ref('profiles/stores/'+user.uid).set({name:'LOJA RECUPERADA',address:'RUA DA LOJA',phone:'27999999999'});
+  await page.goto(base);await page.locator('#tab-register').click();await page.locator('#auth-email').fill(email);
+  await page.locator('[data-action=open-password-recovery]').click();
+  await expect(page.locator('#recovery-email')).toHaveValue(email);
+  await page.locator('#recovery-submit').click();
+  await expect(page.locator('#recovery-feedback')).toHaveAttribute('data-state','success');
+  const key=await page.evaluate(()=>window.EXPRESS_FIREBASE_CONFIG.apiKey);
+  await completePasswordReset(email,newPassword,key);
+  const old=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:oldPassword,returnSecureToken:true})});
+  expect(old.status).toBe(400);
+  await page.locator('[data-action=recovery-back]').click();await page.locator('#auth-password').fill(newPassword);
+  await expect(page.locator('#tab-login')).toHaveClass(/active/);
+  await expect(page.locator('#field-extra')).toBeHidden();
+  await page.locator('[data-admin-login]').click();
+  await expect(page.locator('#auth-feedback')).toContainText('não possui permissão de administrador');
+  expect((await app.auth().getUser(user.uid)).customClaims?.admin).not.toBe(true);
+  await page.locator('[data-action=back-to-profiles]').click();
+  await page.locator('#auth-submit-btn').click();
+  await expect(page.locator('#login-screen')).toBeHidden();
+  await expect(page.locator('#role')).toHaveValue('store');
+});
+
+test('recuperação mostra erro de rede na própria tela e permanece acessível em celular pequeno',async({page})=>{
+  await page.route('**/accounts:sendOobCode**',route=>route.abort());
+  for(const width of [320,393,480]){
+    await page.setViewportSize({width,height:568});await page.goto(base);
+    await page.locator('[data-admin-login]').click();
+    await page.locator('[data-action=open-password-recovery]').click();
+    await page.locator('#recovery-email').fill('network-test@example.test');
+    await page.locator('#recovery-submit').click();
+    await expect(page.locator('#recovery-feedback')).toHaveAttribute('data-state','error');
+    await expect(page.locator('#recovery-feedback')).toContainText('conexão');
+    await expect(page.locator('#recovery-submit')).toBeEnabled();
+    await page.locator('[data-action=recovery-back]').click();
+    await expect(page.locator('#admin-login-panel')).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+});
+
+test('rastreio mantém consulta segura por HTTPS quando WebSocket não está disponível',async({page})=>{
+  const token='d'.repeat(64),root='publicTracking/'+token;
+  await db.ref(root).set({orderCode:'EXP-FALLBACK',status:'open',expiresAt:Date.now()+600000,revoked:false});
+  await page.addInitScript(()=>{window.WebSocket=undefined;});
+  await page.goto('http://127.0.0.1:8080/rastreio/#track='+token);
+  await expect(page.locator('#status')).toHaveText('Aguardando motoboy');
+  await expect(page.locator('#connection')).toContainText('10 s');
+  await db.ref(root).remove();
+  await expect(page.locator('#status')).toContainText('encerrado',{timeout:15000});
+});
+
+
+test('notificações da loja mostram ausência de dispositivo sem afirmar entrega',async({page})=>{
+  await register(page,'store','push-status-'+Date.now()+'@example.test');
+  await preferences(page);await page.locator('[data-action=push-settings]').click();
+  await expect(page.getByRole('dialog',{name:'Notificações e som'})).toBeVisible();
+  await page.locator('[data-push-test]').click();
+  await expect(page.locator('dialog [data-feedback]')).toContainText('Nenhum dispositivo cadastrado');
+  await expect(page.locator('[data-push-test]')).toBeEnabled();
+  await page.locator('dialog [data-close]').click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('diagnóstico nativo revela canal silencioso e volume zero, e teste local usa a categoria escolhida',async({page})=>{
+ await register(page,'store','native-diagnostic-'+Date.now()+'@example.test');
+ await page.evaluate(()=>{
+  window.__qaLocalNotifications=[];window.__qaSoundSettings=[];
+  window.Capacitor.isNativePlatform=()=>true;
+  window.ExpressNativePush.PushNotifications={checkPermissions:async()=>({receive:'granted'})};
+  window.ExpressNativePush.NotificationSettings={prepare:async()=>{},status:async()=>({permission:true,volume:0,ringerMode:0,doNotDisturb:true,batteryOptimized:true,channels:[{id:'express_orders_sound_v1',name:'Novos pedidos',exists:true,importance:2,sound:false}]}),settings:async value=>window.__qaSoundSettings.push(value)};
+  window.ExpressNativePush.LocalNotifications={checkPermissions:async()=>({display:'granted'}),schedule:async value=>window.__qaLocalNotifications.push(value)};
+ });
+ await preferences(page);await page.locator('[data-action=push-settings]').click();
+ await expect(page.locator('[data-android-diagnostics]')).toContainText('Volume de notificações zerado');
+ await expect(page.locator('[data-android-diagnostics]')).toContainText('Não perturbe está ativado');
+ await expect(page.locator('[data-android-diagnostics]')).toContainText('silenciosa ou bloqueada');
+ await page.locator('#push-category').selectOption('order');
+ await page.locator('[data-local-test]').click();
+ await expect(page.locator('dialog [data-feedback]')).toContainText('Aviso local solicitado');
+ expect(await page.evaluate(()=>window.__qaLocalNotifications[0].notifications[0].channelId)).toBe('express_orders_sound_v1');
+ await page.locator('[data-sound-settings]').click();
+ expect(await page.evaluate(()=>window.__qaSoundSettings[0].channel)).toBe('express_orders_sound_v1');
+ await page.locator('[data-close]').click();
+});
+
+test('aprovação e bloqueio em tempo real, cuidados no aceite, cancelamento de alerta e impressão',async({browser})=>{
+  const ctx=await browser.newContext({viewport:{width:393,height:852}}),rctx=await browser.newContext({viewport:{width:393,height:852}}),actx=await browser.newContext({viewport:{width:393,height:852}});
+  const store=await ctx.newPage(),rider=await rctx.newPage(),adminPage=await actx.newPage();
+  const errors=[];for(const p of [store,rider,adminPage])p.on('pageerror',e=>errors.push(e.message));
+  const suffix=Date.now();
+  const adminUser=await app.auth().createUser({email:'approval-admin-'+suffix+'@example.test',password:'test-password-123'});
+  await app.auth().setCustomUserClaims(adminUser.uid,{admin:true});
+  await adminPage.goto(base);
+  await adminPage.locator('#auth-email').fill(adminUser.email);await adminPage.locator('#auth-password').fill('test-password-123');await adminPage.locator('[data-admin-login]').click();
+  await expect(adminPage.locator('#login-screen')).toBeHidden();
+  // Register without bypassing the actual approval UI.
+  await store.goto(base);await store.locator('#tab-register').click();await store.locator('#auth-name').fill('LOJA APROVAÇÃO');await store.locator('#auth-extra').fill('27999999999');await store.locator('#auth-email').fill('approval-shop-'+suffix+'@example.test');await store.locator('#auth-password').fill('test-password-123');await store.locator('#auth-submit-btn').click();
+  await expect(store.getByRole('heading',{name:'Cadastro aguardando aprovação'})).toBeVisible();
+  const shop=await app.auth().getUserByEmail('approval-shop-'+suffix+'@example.test');
+  await adminPage.evaluate(()=>window.__express.setView('registry'));
+  await adminPage.locator('[data-action=account-access][data-id="'+shop.uid+'"][data-status=approved]').click();await adminPage.locator('dialog [data-decision=confirm]').click();
+  await expect(store.getByRole('heading',{name:'Cadastro aguardando aprovação'})).toHaveCount(0);
+  await store.evaluate(()=>window.__express.setView('profile'));await store.locator('#prof-address').fill('Rua da Loja, 10');await store.locator('#store-profile-form button[type=submit]').click();await expect(store.locator('#store-profile-form')).toHaveCount(0);
+  await register(rider,'courier','care-rider-'+suffix+'@example.test');await rider.locator('[data-toggle-availability]').click();
+  await store.evaluate(()=>window.__express.openSheet());await beginCustomer(store);await store.locator('#inp-client').fill('CLIENTE CUIDADOS');await store.locator('#inp-street').fill('RUA DESTINO');await store.locator('#inp-number').fill('15');await store.locator('#input-neighborhood').fill('Centro');await store.locator('#inp-notes').fill('NÃO EMPILHAR. MANTER EM PÉ.');await store.locator('#inp-fragile').check();await store.locator('#inp-important-notes').check();await confirmCustomer(store);await store.locator('#mobile-order-form button[type=submit]').click();await expect(store.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  const orders=(await db.ref('storeOrders/'+shop.uid).get()).val();const id=Object.keys(orders)[0];
+  await expect(rider.locator('[data-order-id="'+id+'"]')).toContainText('CONTEÚDO FRÁGIL');
+  await rider.locator('[data-action=accept][data-id="'+id+'"]').click();await expect(rider.locator('dialog')).toContainText('NÃO EMPILHAR');await rider.locator('dialog [data-decision=cancel]').click();
+  expect((await db.ref('orders/'+id+'/status').get()).val()).toBe('open');
+  await rider.locator('[data-action=accept][data-id="'+id+'"]').click();await rider.getByRole('button',{name:'Li e estou ciente'}).click();await expect(rider.locator('[data-order-id="'+id+'"]')).toContainText('OBSERVAÇÃO IMPORTANTE');
+  await expect.poll(async()=>(await db.ref('orders/'+id+'/careAcknowledgedBy').get()).val()).toBe((await app.auth().getUserByEmail('care-rider-'+suffix+'@example.test')).uid);
+  await store.evaluate(()=>window.__express.setView('run'));
+  // Stub only the OS print dialog, keep the real print document and popup.
+  await store.evaluate(()=>{const original=window.open;window.open=function(...args){const win=original.apply(this,args);win.print=()=>{win.__printed=true;};return win;};});
+  const popupPromise=store.waitForEvent('popup');await store.locator('[data-action=print-order][data-id="'+id+'"]').click();const popup=await popupPromise;await expect(popup.locator('body')).toContainText('CLIENTE CUIDADOS');await expect(popup.locator('body')).toContainText('NÃO EMPILHAR');expect(await popup.evaluate(()=>window.__printed)).toBe(true);await popup.close();
+  await store.evaluate(()=>window.__express.setView('alerts'));await store.locator('#alert-message').fill('AVISO PARA CANCELAR');await store.locator('#alert-form button').click();await expect(store.locator('#alert-message')).toHaveValue('');
+  const alerts=(await db.ref('alerts').get()).val();const aid=Object.keys(alerts).find(k=>alerts[k].senderId===shop.uid&&alerts[k].message==='AVISO PARA CANCELAR');
+  await store.locator('[data-action=cancel-alert][data-id="'+aid+'"]').click();await store.locator('dialog [data-decision=confirm]').click();await expect(store.locator('#hero-alert-track')).not.toContainText('AVISO PARA CANCELAR');await expect(store.locator('#content')).toContainText('CANCELADO · AVISO PARA CANCELAR');
+  await adminPage.locator('[data-action=account-access][data-id="'+shop.uid+'"][data-status=blocked]').click();await adminPage.locator('#access-reason').fill('CONFERIR DADOS');await adminPage.locator('dialog button[type=submit]').click();await expect(store.getByRole('heading',{name:'Acesso bloqueado'})).toBeVisible();await expect(store.locator('#content')).toContainText('CONFERIR DADOS');
+  await store.getByRole('button',{name:'Sair da conta'}).click();await expect(store.locator('#login-screen')).toBeVisible();
+  expect(errors).toEqual([]);await ctx.close();await rctx.close();await actx.close();
+});
+
+test('aceite consulta cuidados no servidor mesmo com resumo antigo e pede nova leitura após edição',async({browser})=>{
+ await db.ref('config').set({rates:{night:0,lateMinimum:7}}); // Fixture de preço estável, inclusive em testes noturnos.
+  const shopContext=await browser.newContext({viewport:{width:393,height:852}}),riderContext=await browser.newContext({viewport:{width:393,height:852}});
+  const shop=await shopContext.newPage(),rider=await riderContext.newPage();const suffix=Date.now();
+  try{
+    await register(shop,'store','care-refresh-shop-'+suffix+'@example.test');
+    const shopUser=await app.auth().getUserByEmail('care-refresh-shop-'+suffix+'@example.test');
+    await db.ref('profiles/stores/'+shopUser.uid+'/address').set('RUA DA LOJA, 1');
+    const fields={serviceType:'delivery',serviceDate:'2026-11-16',city:'ARACRUZ',clientNeighborhood:'ITAPUTERA',client:'CLIENTE TESTE',clientStreet:'RUA TESTE',clientNumber:'520',paymentMethod:'money',notes:'NÃO BUZINAR',fragile:true,importantNotes:true};
+    const save=async(id,input)=>shop.evaluate(async({id,input})=>{const f=window.ExpressFirebase;return (await f.httpsCallable(f.getFunctions(undefined,'southamerica-east1'),'orderCommand')({action:'saveOrder',orderId:id,requestId:crypto.randomUUID(),input})).data;},{id,input});
+    const {orderId:id}=await save(null,fields);
+    await db.ref('availableOrders/'+id).update({fragile:null,importantNotes:null});
+    await register(rider,'courier','care-refresh-rider-'+suffix+'@example.test');
+    await rider.locator('[data-toggle-availability]').click();
+    const card=rider.locator('[data-order-id="'+id+'"]');await expect(card).toBeVisible();
+    await card.locator('[data-action=accept]').click();
+    await expect(rider.locator('dialog')).toContainText('NÃO BUZINAR');
+    await rider.locator('dialog [data-decision=cancel]').click();
+    expect((await db.ref('orders/'+id+'/status').get()).val()).toBe('open');
+    await expect(card).toContainText('CONTEÚDO FRÁGIL');await expect(card).toContainText('NÃO BUZINAR');
+    await card.locator('[data-action=accept]').click();await expect(rider.locator('dialog')).toContainText('NÃO BUZINAR');
+    await save(id,{...fields,notes:'LIGAR AO CHEGAR. NÃO BUZINAR.'});
+    await rider.locator('dialog [data-decision=confirm]').click();
+    await expect(rider.locator('dialog')).toContainText('LIGAR AO CHEGAR');
+    expect((await db.ref('orders/'+id+'/status').get()).val()).toBe('open');
+    await rider.locator('dialog [data-decision=confirm]').click();
+    await expect.poll(async()=>(await db.ref('orders/'+id+'/status').get()).val()).toBe('run');
+    const order=(await db.ref('orders/'+id).get()).val();
+    expect(order.careAcknowledgedBy).toBe((await app.auth().getUserByEmail('care-refresh-rider-'+suffix+'@example.test')).uid);
+    expect(order.fee).toBe(7);expect(order.notes).toBe('LIGAR AO CHEGAR. NÃO BUZINAR.');
+    await expect(rider.locator('[data-order-id="'+id+'"]')).toContainText('LIGAR AO CHEGAR');
+  }finally{await shopContext.close();await riderContext.close();}
+});
+
+test('duas viagens cobram separado, liberam o primeiro motoboy e permitem repassar a devolução',async({browser})=>{
+ await db.ref('config').set({rates:{night:0,lateMinimum:7}}); // Fixture de preço estável, inclusive em testes noturnos.
+ const contexts=await Promise.all([1,2,3].map(()=>browser.newContext({viewport:{width:393,height:852}})));const [shop,a,b]=await Promise.all(contexts.map(c=>c.newPage()));const suffix=Date.now();
+ try{
+  await register(shop,'store','two-shop-'+suffix+'@example.test');await shop.evaluate(()=>window.__express.setView('profile'));await shop.locator('#prof-address').fill('RUA DA LOJA, 1');await shop.locator('#store-profile-form button[type=submit]').click();await expect(shop.locator('#store-profile-form')).toHaveCount(0);
+  await register(a,'courier','two-a-'+suffix+'@example.test');await register(b,'courier','two-b-'+suffix+'@example.test');await a.locator('[data-toggle-availability]').click();await b.locator('[data-toggle-availability]').click();
+  await shop.evaluate(()=>window.__express.openSheet());await shop.locator('#service-type-select').selectOption('roundtrip');await beginCustomer(shop);await shop.locator('#inp-client').fill('CLIENTE DAS DUAS VIAGENS');await shop.locator('#inp-street').fill('RUA DO CLIENTE');await shop.locator('#inp-number').fill('1');await shop.locator('#input-neighborhood').fill('CENTRO');await expect(shop.locator('#quote-price-mobile')).toContainText('R$ 14,00');await confirmCustomer(shop);await shop.locator('#btn-submit-order').click();await expect(shop.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  const user=await app.auth().getUserByEmail('two-shop-'+suffix+'@example.test');const os=(await db.ref('storeOrders/'+user.uid).get()).val();const id=Object.keys(os).find(id=>os[id].legNumber===1),ret=os[id].returnOrderId;
+  await a.locator('[data-action=accept][data-id="'+id+'"]').click();await a.locator('[data-action=picked][data-id="'+id+'"]').click();await a.locator('[data-action=finish][data-id="'+id+'"]').click();await expect(a.locator('[data-work-status]')).toHaveText('DISPONÍVEL');
+  await shop.locator('[data-action=requestReturn][data-id="'+ret+'"]').click();await shop.locator('dialog [data-decision=confirm]').click();await a.evaluate(()=>window.__express.setView('available'));
+  await expect(a.locator('[data-order-id="'+ret+'"]')).toContainText('Prioridade do primeiro motoboy');await expect(b.locator('[data-order-id="'+ret+'"]')).toHaveCount(0);
+  await a.locator('[data-action=releaseReturn][data-id="'+ret+'"]').click();await a.locator('dialog [data-decision=confirm]').click();await b.locator('[data-action=accept][data-id="'+ret+'"]').click();await b.locator('[data-action=picked][data-id="'+ret+'"]').click();await b.locator('[data-action=finish][data-id="'+ret+'"]').click();
+  await expect.poll(async()=>(await db.ref('orders/'+ret+'/status').get()).val()).toBe('done');
+  const first=(await db.ref('orders/'+id).get()).val(),second=(await db.ref('orders/'+ret).get()).val();expect(first.fee).toBe(7);expect(second.fee).toBe(7);expect(first.courierId).not.toBe(second.courierId);expect(first.status).toBe('done');expect(second.status).toBe('done');
+ }finally{for(const c of contexts)await c.close();}
+});
+
+test('rota múltipla soma tarifas, mostra bairros, bloqueia novas corridas e libera após todas as paradas',async({browser},testInfo)=>{
+ testInfo.setTimeout(120000);
+ await db.ref('config').set({rates:{night:0,lateMinimum:7}}); // Fixture de preço estável, inclusive em testes noturnos.
+ const sc=await browser.newContext({viewport:{width:393,height:852}}),cc=await browser.newContext({viewport:{width:393,height:852}});const shop=await sc.newPage(),rider=await cc.newPage(),suffix=Date.now();
+ try{
+  await register(shop,'store','route-shop-'+suffix+'@example.test');await shop.evaluate(()=>window.__express.setView('profile'));await shop.locator('#prof-address').fill('RUA DA COLETA, 1');await shop.locator('#store-profile-form button[type=submit]').click();await expect(shop.locator('#store-profile-form')).toHaveCount(0);
+  await register(rider,'courier','route-rider-'+suffix+'@example.test');await rider.locator('[data-toggle-availability]').click();await shop.evaluate(()=>window.__express.setView('routes'));const routeSummary=shop.locator('#content > section.panel:not(.v3-tutorial) h2').first();
+  for(const [index,bairro]of ['CENTRO','ITAPUTERA','SÃO MARCOS'].entries()){
+   await shop.locator('[data-action=route-add]').click();await beginCustomer(shop);await shop.locator('#inp-client').fill('CLIENTE '+(index+1));await shop.locator('#inp-street').fill('RUA '+(index+1));await shop.locator('#inp-number').fill('1');await shop.locator('#input-neighborhood').fill(bairro);if(index===1){await shop.locator('#inp-fragile').check();await shop.locator('#inp-notes').fill('MANTER EM PÉ');}await confirmCustomer(shop);await shop.locator('#btn-submit-order').click();await expect(shop.locator('#order-sheet-overlay')).not.toHaveClass(/active/);await expect(routeSummary).toContainText((index+1)+' entregas');
+  }
+  await expect(routeSummary).toContainText('R$ 21,00');await shop.locator('[data-action=route-publish]').click();await shop.locator('dialog [data-decision=confirm]').click();
+  const user=await app.auth().getUserByEmail('route-shop-'+suffix+'@example.test');const id=await shop.locator('[data-order-id]').first().getAttribute('data-order-id');const canonical=(await db.ref('orders/'+id).get()).val();expect(canonical.storeId).toBe(user.uid);expect(canonical.kind).toBe('route');const card=rider.locator('[data-order-id="'+id+'"]');await expect(card).toContainText('3 ENTREGAS');await expect(card).toContainText('ITAPUTERA');await expect(card).toContainText('R$ 21,00');await expect(card).not.toContainText('CLIENTE 1');
+  await card.locator('[data-action=accept]').click();await expect(rider.locator('dialog')).toContainText('MANTER EM PÉ');await rider.locator('dialog [data-decision=confirm]').click();await expect(rider.locator('#content')).toContainText('ROTA EM EXECUÇÃO');
+  await rider.locator('[data-action=routePickup]').click();await rider.locator('dialog [data-decision=confirm]').click();
+  await expect(card.locator('[data-route-navigation]')).toHaveAttribute('href',/destination=.*waypoints=/);
+  for(let i=0;i<3;i++){
+   const button=rider.locator('[data-action=finishRouteStop]');await expect(button).toHaveCount(1);await button.click();await rider.locator('dialog [data-decision=confirm]').click();await expect.poll(async()=>(await db.ref('orders/'+id+'/completedStops').get()).val()).toBe(i+1);if(i<2)await expect(rider.locator('#content')).toContainText('NOVAS CORRIDAS BLOQUEADAS');
+  }
+  await expect(rider.locator('[data-work-status]')).toHaveText('DISPONÍVEL');await rider.evaluate(()=>window.__express.setView('done'));await expect(rider.locator('[data-order-id]')).toHaveCount(3);
+  for(const page of [shop,rider])expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ }finally{await sc.close();await cc.close();}
+});
+
+test('rota entre lojas exige adesão, preserva dados por loja e confirma coletas separadas',async({browser},testInfo)=>{
+ testInfo.setTimeout(120000);
+ await db.ref('config').set({rates:{night:0,lateMinimum:7},offerDistribution:{enabled:false}});
+ const contexts=await Promise.all([1,2,3].map(()=>browser.newContext({viewport:{width:393,height:852}})));const [creator,partner,rider]=await Promise.all(contexts.map(c=>c.newPage()));const suffix=Date.now();
+ try{
+  await register(creator,'store','shared-route-a-'+suffix+'@example.test');await creator.evaluate(()=>window.__express.setView('profile'));await creator.locator('#prof-address').fill('RUA DA LOJA A, 1');await creator.locator('#store-profile-form button[type=submit]').click();await expect(creator.locator('#store-profile-form')).toHaveCount(0);
+  await register(partner,'store','shared-route-b-'+suffix+'@example.test');await partner.evaluate(()=>window.__express.setView('profile'));await partner.locator('#prof-address').fill('RUA DA LOJA B, 2');await partner.locator('#store-profile-form button[type=submit]').click();await expect(partner.locator('#store-profile-form')).toHaveCount(0);
+  await register(rider,'courier','shared-route-rider-'+suffix+'@example.test');await rider.locator('[data-toggle-availability]').click();
+  console.log('[shared-route] perfis prontos');
+  await creator.evaluate(()=>window.__express.setView('routes'));
+  for(const [index,label] of ['CLIENTE LOJA A 1','CLIENTE LOJA A 2'].entries()){
+   await creator.locator('[data-action=route-add]').click();await beginCustomer(creator);await creator.locator('#inp-client').fill(label);await creator.locator('#inp-street').fill('RUA A '+(index+1));await creator.locator('#inp-number').fill('1');await creator.locator('#input-neighborhood').fill('CENTRO');await confirmCustomer(creator);await creator.locator('#btn-submit-order').click();try{await expect(creator.locator('#order-sheet-overlay')).not.toHaveClass(/active/);}catch(error){throw new Error(error.message+' Toast: '+await creator.locator('#toasts').innerText()+' | Cliente: '+await creator.locator('#phone-customer-panel').innerText());}
+  }
+  await creator.locator('#route-cross-store').check();await creator.locator('[data-action=route-publish]').click();await creator.locator('dialog [data-decision=confirm]').click();
+  const creatorUser=await app.auth().getUserByEmail('shared-route-a-'+suffix+'@example.test'),partnerUser=await app.auth().getUserByEmail('shared-route-b-'+suffix+'@example.test');
+  await expect.poll(async()=>Object.values((await db.ref('storeOrders/'+creatorUser.uid).get()).val()||{}).some(o=>o.kind==='route')).toBe(true);
+  const creatorOrders=(await db.ref('storeOrders/'+creatorUser.uid).get()).val(),routeId=Object.keys(creatorOrders).find(id=>creatorOrders[id].kind==='route');expect((await db.ref('orders/'+routeId+'/status').get()).val()).toBe('route_collecting');
+  await partner.evaluate(()=>window.__express.openSheet());await beginCustomer(partner);await partner.locator('#inp-client').fill('CLIENTE PRIVADO LOJA B');await partner.locator('#inp-street').fill('RUA PRIVADA B');await partner.locator('#inp-number').fill('9');await partner.locator('#input-neighborhood').fill('CENTRO');await confirmCustomer(partner);await partner.locator('#btn-submit-order').click();await expect(partner.locator('#order-sheet-overlay')).not.toHaveClass(/active/);
+  const partnerOrders=(await db.ref('storeOrders/'+partnerUser.uid).get()).val(),partnerStop=Object.keys(partnerOrders).find(id=>partnerOrders[id].client==='CLIENTE PRIVADO LOJA B');
+  await partner.evaluate(()=>window.__express.setView('routes'));partner.once('dialog',dialog=>dialog.accept(routeId));await partner.locator('[data-action=route-join]').click();await partner.locator('[data-route-select="'+partnerStop+'"]').check();await partner.locator('[data-action=route-join-submit]').click();await partner.locator('dialog [data-decision=confirm]').click();
+  await expect.poll(async()=>(await db.ref('storeOrders/'+partnerUser.uid+'/'+routeId).get()).val()?.deliveryCount).toBe(3);
+  await expect(creator.locator('[data-order-id="'+routeId+'"]').last()).not.toContainText('CLIENTE PRIVADO LOJA B');await expect(partner.locator('[data-order-id="'+routeId+'"]').last()).not.toContainText('CLIENTE LOJA A');
+  await creator.locator('[data-action=publishRoute][data-id="'+routeId+'"]').click();await creator.locator('dialog [data-decision=confirm]').click();await rider.evaluate(()=>window.__express.setView('available'));
+  const routeCard=rider.locator('[data-order-id="'+routeId+'"]');await expect(routeCard).toContainText('3 ENTREGAS');await expect(routeCard).not.toContainText('CLIENTE LOJA A');await routeCard.locator('[data-action=accept]').click();await expect.poll(async()=>(await db.ref('orders/'+routeId+'/status').get()).val()).toBe('run');
+  await expect(routeCard).toContainText('CLIENTE PRIVADO LOJA B');await expect(routeCard).toContainText('RUA DA LOJA A');await expect(routeCard).toContainText('RUA DA LOJA B');
+  const stopA=routeCard.locator('[data-action=routePickup][data-pickup-store-id="'+creatorUser.uid+'"]'),stopB=routeCard.locator('[data-action=routePickup][data-pickup-store-id="'+partnerUser.uid+'"]');await stopA.click();await rider.locator('dialog [data-decision=confirm]').click();await expect.poll(async()=>(await db.ref('orders/'+routeId+'/routePickupStoreIds/'+creatorUser.uid).get()).exists()).toBe(true);await expect(routeCard.locator('[data-action=finishRouteStop]')).toHaveCount(0);
+  await stopB.click();await rider.locator('dialog [data-decision=confirm]').click();await expect.poll(async()=>(await db.ref('orders/'+routeId+'/picked').get()).exists()).toBe(true);
+ }finally{for(const c of contexts)await c.close();}
+});
+
+test('cliente atualizado preserva entregas simples enquanto o servidor novo ainda não foi publicado',async({page})=>{
+ await page.route('**/southamerica-east1/orderCommand',route=>{const data=route.request().postDataJSON()?.data;if(data?.action==='getCapabilities')return route.fulfill({status:400,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:{status:'INVALID_ARGUMENT',message:'Ação desconhecida.'}})});return route.continue();});
+ await register(page,'store','rollout-shop-'+Date.now()+'@example.test');await page.evaluate(()=>window.__express.setView('profile'));await page.locator('#prof-address').fill('RUA DA LOJA, 1');await page.locator('#store-profile-form button[type=submit]').click();await expect(page.locator('#store-profile-form')).toHaveCount(0);
+ await page.evaluate(()=>window.__express.setView('routes'));await expect(page.locator('#content')).toContainText('atualização do servidor');await expect(page.locator('[data-action=route-publish]')).toHaveCount(0);
+ await page.evaluate(()=>window.__express.openSheet());await expect(page.locator('#service-type-select option[value=roundtrip]')).toBeDisabled();await beginCustomer(page);await page.locator('#inp-client').fill('CLIENTE NORMAL');await page.locator('#inp-street').fill('RUA NORMAL');await page.locator('#inp-number').fill('1');await page.locator('#input-neighborhood').fill('CENTRO');await confirmCustomer(page);await page.locator('#btn-submit-order').click();await expect(page.locator('#order-sheet-overlay')).not.toHaveClass(/active/);await expect(page.locator('#content')).toContainText('CLIENTE NORMAL');
+});

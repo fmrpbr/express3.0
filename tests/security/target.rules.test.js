@@ -1,0 +1,113 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
+const require = createRequire(new URL("../firebase-rules/package.json", import.meta.url));
+const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
+const { get, ref, set, update } = require("firebase/database");
+import test, { before, after, beforeEach } from "node:test";
+
+const envPromise = initializeTestEnvironment({
+  projectId: "demo-express-entregas-security",
+  database: {
+    rules: readFileSync(resolve(process.cwd(), "../../database.rules.json"), "utf8"),
+    host: "127.0.0.1",
+    port: 9000
+  }
+});
+let env;
+before(async () => { env = await envPromise; });
+after(async () => { await env?.cleanup(); });
+beforeEach(async () => {
+  await env.clearDatabase();
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.database();
+    const now = Date.now();
+    await set(ref(db, "profiles/stores/storeA"), { name: "Loja A" });
+    await set(ref(db, "profiles/stores/storeB"), { name: "Loja B" });
+    await set(ref(db, "profiles/couriers/courierA"), { name: "Motoboy A" });
+    await set(ref(db, "orders/orderA"), { storeId: "storeA", courierId: "courierA", status: "open" });
+    await set(ref(db, "orders/orderB"), { storeId: "storeB", status: "open" });
+    await set(ref(db, "storeOrders/storeA/orderA"), true);
+    await set(ref(db, "storeOrders/storeB/orderB"), true);
+    await set(ref(db, "courierOrders/courierA/orderA"), true);
+    await set(ref(db, "availableOrders/orderB"), true);
+    await set(ref(db, "quoteBoard/quoteA"), { city: "Aracruz" });
+    await set(ref(db, "courierPresence/courierA"), { registered: true, online: true, busy: false, lastSeen: now });
+    await set(ref(db, "publicTracking/public-token"), { status: "run", expiresAt: Date.now()+600000, revoked: false });
+    await set(ref(db, "fcmTokens/storeA/deviceA"), { token: "fake-token-12345678901234567890", platform: "android", updatedAt: now });
+  });
+});
+const dbAs = uid => env.authenticatedContext(uid).database();
+const anon = () => env.unauthenticatedContext().database();
+
+test("loja consulta somente seu índice de pedidos", async () => {
+  await assertSucceeds(get(ref(dbAs("storeA"), "storeOrders/storeA")));
+  await assertFails(get(ref(dbAs("storeA"), "storeOrders/storeB")));
+  await assertFails(get(ref(dbAs("storeA"), "orders")));
+  await assertFails(get(ref(dbAs("storeA"), "orders/orderB")));
+});
+test("motoboy consulta sua fila e quadro de cotações, sem acesso à fila de outra loja", async () => {
+  await assertSucceeds(get(ref(dbAs("courierA"), "courierOrders/courierA")));
+  await assertSucceeds(get(ref(dbAs("courierA"), "availableOrders")));
+  await assertSucceeds(get(ref(dbAs("courierA"), "quoteBoard")));
+  await assertFails(get(ref(dbAs("storeA"), "availableOrders")));
+});
+test("presença só fica visível para usuários com perfil válido", async () => {
+  await assertSucceeds(get(ref(dbAs("storeA"), "courierPresence")));
+  await assertSucceeds(get(ref(dbAs("courierA"), "courierPresence")));
+  await assertFails(get(ref(dbAs("visitor"), "courierPresence")));
+  await assertFails(get(ref(anon(), "courierPresence")));
+});
+test("somente o próprio motoboy pode alterar sua presença", async () => {
+  const next = { registered: true, online: false, busy: false, lastSeen: Date.now() };
+  await assertFails(set(ref(dbAs("courierA"), "courierPresence/courierA"), next));
+  await assertSucceeds(update(ref(dbAs("courierA"), "courierPresence/courierA"), { availableForWork: true }));
+  await assertFails(set(ref(dbAs("storeA"), "courierPresence/courierA"), next));
+  await assertFails(set(ref(dbAs("courierA"), "courierPresence/courierB"), next));
+});
+test("motoboy pode ativar e pausar sua disponibilidade sem alterar presença online", async () => {
+  const ownPresence = ref(dbAs("courierA"), "courierPresence/courierA");
+  await assertSucceeds(update(ownPresence, { availableForWork: true }));
+  await assertSucceeds(update(ownPresence, { availableForWork: false }));
+  await assertFails(update(ref(dbAs("storeA"), "courierPresence/courierA"), { availableForWork: true }));
+  await assertFails(update(ref(dbAs("courierA"), "courierPresence/courierB"), { availableForWork: true }));
+});
+test("rastreamento continua público apenas para token existente", async () => {
+  await assertSucceeds(get(ref(anon(), "publicTracking/public-token")));
+  await assertFails(get(ref(anon(), "publicTracking/unknown-token")));
+});
+test("token FCM permanece privado por UID", async () => {
+  await assertSucceeds(get(ref(dbAs("storeA"), "fcmTokens/storeA")));
+  await assertFails(get(ref(dbAs("storeB"), "fcmTokens/storeA")));
+});
+test("pedido canônico e índices não podem ser alterados diretamente pelo cliente", async () => {
+  await assertFails(set(ref(dbAs("storeA"), "orders/newOrder"), { storeId: "storeA", status: "open" }));
+  await assertFails(set(ref(dbAs("storeA"), "storeOrders/storeA/newOrder"), true));
+  await assertFails(set(ref(dbAs("courierA"), "availableOrders/newOrder"), true));
+});
+
+test('pendente/reprovado/bloqueado lê apenas seu cadastro e não opera por cliente antigo', async () => {
+  for (const accessStatus of ['pending','rejected','blocked']) {
+    await env.withSecurityRulesDisabled(async context => {
+      await update(ref(context.database(),'profiles/couriers/courierA'),{accessStatus});
+      await update(ref(context.database(),'profiles/stores/storeA'),{accessStatus});
+    });
+    await assertSucceeds(get(ref(dbAs('courierA'),'profiles/couriers/courierA')));
+    await assertSucceeds(get(ref(dbAs('storeA'),'profiles/stores/storeA')));
+    for(const path of ['availableOrders','quoteBoard','courierOrders/courierA','orders/orderA','courierPresence','alerts','config/rates'])await assertFails(get(ref(dbAs('courierA'),path)));
+    await assertFails(get(ref(dbAs('storeA'),'storeOrders/storeA')));
+    await assertFails(set(ref(dbAs('courierA'),'courierPresence/courierA/availableForWork'),true));
+    await assertFails(set(ref(dbAs('courierA'),'courierConnections/courierA/session'),{lastSeen:Date.now()}));
+    await assertFails(update(ref(dbAs('courierA'),'profiles/couriers/courierA'),{accessStatus:'approved'}));
+  }
+  await env.withSecurityRulesDisabled(context=>update(ref(context.database(),'profiles/couriers/courierA'),{accessStatus:'approved'}));
+  await assertSucceeds(get(ref(dbAs('courierA'),'availableOrders')));
+});
+
+test('ofertas prioritárias só são lidas pelo destinatário/admin e prazos não são alterados por clientes',async()=>{
+ await env.withSecurityRulesDisabled(async context=>{await set(ref(context.database(),'courierOffers/courierA/return'),{status:'return_priority',fee:7,priorityUntil:Date.now()+300000});});
+ await assertSucceeds(get(ref(dbAs('courierA'),'courierOffers/courierA')));
+ await assertFails(get(ref(dbAs('storeA'),'courierOffers/courierA')));
+ await assertFails(set(ref(dbAs('courierA'),'courierOffers/courierA/return/priorityUntil'),0));
+ await assertFails(set(ref(dbAs('courierA'),'returnTimers/return'),{until:0}));
+});

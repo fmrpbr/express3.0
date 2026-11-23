@@ -1,0 +1,14 @@
+node_modules/
+functions/node_modules/
+tests/firebase-rules/node_modules/
+.firebase/
+firebase-debug.log
+database-debug.log
+*-debug.log
+www/firebase-config.js
+**/.env*
+playwright-report/
+test-results/
+android/
+public-site/
+*.apk

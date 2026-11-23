@@ -1,0 +1,346 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "profiles": {
+      "stores": {
+        ".read": "auth != null && auth.token.admin === true",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid || (auth != null && auth.token.admin === true)",
+          ".write": false
+        }
+      },
+      "couriers": {
+        ".read": "auth != null && auth.token.admin === true",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid || (auth != null && auth.token.admin === true)",
+          ".write": false
+        }
+      }
+    },
+    "orders": {
+      ".read": "(auth != null && auth.token.admin === true) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      "$orderId": {
+        ".read": "(auth != null && (auth.token.admin === true || data.child('storeId').val() === auth.uid || data.child('courierId').val() === auth.uid)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      }
+    },
+    "storeOrders": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid || (auth != null && auth.token.admin === true)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      }
+    },
+    "courierOrders": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid || (auth != null && auth.token.admin === true)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      }
+    },
+    "courierBids": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid || (auth != null && auth.token.admin === true)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      }
+    },
+    "availableOrders": {
+      ".read": "((auth != null && root.child('profiles/couriers').child(auth.uid).exists()) || (auth != null && auth.token.admin === true)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      ".write": false
+    },
+    "quoteBoard": {
+      ".read": "((auth != null && root.child('profiles/couriers').child(auth.uid).exists()) || (auth != null && auth.token.admin === true)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      ".write": false
+    },
+    "publicTracking": {
+      "$token": {
+        ".read": "data.exists() && data.child('revoked').val() === false && data.child('expiresAt').val() > now",
+        ".write": false
+      }
+    },
+    "courierPresence": {
+      ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      "$uid": {
+        ".write": false,
+        "availableForWork": {
+          ".write": "(auth != null && auth.uid === $uid && (auth != null && root.child('profiles/couriers').child(auth.uid).exists()) && newData.isBoolean()) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))"
+        }
+      }
+    },
+    "courierConnections": {
+      ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      "$uid": {
+        "$session": {
+          ".write": "(auth != null && auth.uid === $uid && (auth != null && root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+          ".validate": "newData.hasChildren(['lastSeen'])",
+          "lastSeen": {
+            ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "config": {
+      "offerDistribution": {
+        ".read": "auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())",
+        ".write": false
+      },
+      "cities": {
+        ".read": "auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))) ",
+        ".write": false
+      },
+      "externalIntegrations": {
+        ".read": "auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())",
+        ".write": false
+      },
+      "rates": {
+        ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      },
+      "tariffPlans": {
+        ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      },
+      "tariffCancellations": {
+        ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      },
+      "rainPlans": {
+        ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      },
+      "rainSummary": {
+        ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      }
+    },
+    "pushJobs": {
+      ".indexOn": [
+        "nextAt"
+      ]
+    },
+    "alerts": {
+      ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      ".indexOn": [
+        "expiresAt",
+        "senderId",
+        "createdAt"
+      ],
+      "$alertId": {
+        ".write": "((auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && !data.exists() && newData.exists() && newData.child('senderId').val() === auth.uid) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".validate": "newData.hasChildren(['senderId','senderRole','senderName','message','createdAt','expiresAt'])",
+        "senderId": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "senderRole": {
+          ".validate": "(newData.val() === 'store' && root.child('profiles/stores').child(auth.uid).exists()) || (newData.val() === 'courier' && root.child('profiles/couriers').child(auth.uid).exists())"
+        },
+        "senderName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80 && ((newData.parent().child('senderRole').val() === 'store' && newData.val() === root.child('profiles/stores').child(auth.uid).child('name').val()) || (newData.parent().child('senderRole').val() === 'courier' && newData.val() === root.child('profiles/couriers').child(auth.uid).child('name').val()))"
+        },
+        "message": {
+          ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 120"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 60000"
+        },
+        "expiresAt": {
+          ".validate": "newData.isNumber() && newData.val() > now && newData.val() <= newData.parent().child('createdAt').val() + 7200000"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "fcmTokens": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$tokenId": {
+          ".write": "auth != null && auth.uid === $uid && !newData.exists()",
+          ".validate": "newData.hasChildren(['token','platform','updatedAt'])",
+          "token": {
+            ".validate": "newData.isString() && newData.val().length >= 20 && newData.val().length <= 4096"
+          },
+          "platform": {
+            ".validate": "newData.val() === 'android'"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          },
+          "deviceId": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "notificationSchema": {
+            ".validate": "newData.val() === 'legacy' || newData.val() === 'sound-v1'"
+          }
+        }
+      }
+    },
+    "pushPreferences": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": "(auth != null && auth.uid === $uid && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists()) && newData.exists()) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        "enabled": {
+          ".validate": "newData.isBoolean()"
+        },
+        "orders": {
+          ".validate": "newData.isBoolean()"
+        },
+        "quotes": {
+          ".validate": "newData.isBoolean()"
+        },
+        "reminders": {
+          ".validate": "newData.isBoolean()"
+        },
+        "$other": {
+          ".validate": false
+        },
+        "alerts": {
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "pushSubscriptions": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        "$device": {
+          ".write": "(auth != null && auth.uid === $uid && (auth != null && (root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists()))) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+          ".validate": "newData.hasChildren(['endpoint','keys','updatedAt'])",
+          "endpoint": {
+            ".validate": "newData.isString() && newData.val().length <= 2048 && (newData.val().beginsWith('https://fcm.googleapis.com/') || newData.val().beginsWith('https://web.push.apple.com/') || newData.val().matches(/^https:\\/\\/[a-z0-9-]+\\.push\\.services\\.mozilla\\.com\\/.+$/) || newData.val().matches(/^https:\\/\\/[a-z0-9.-]+\\.notify\\.windows\\.com\\/.+$/))"
+          },
+          "keys": {
+            ".validate": "newData.hasChildren(['p256dh','auth'])",
+            "p256dh": {
+              ".validate": "newData.isString() && newData.val().length <= 256"
+            },
+            "auth": {
+              ".validate": "newData.isString() && newData.val().length <= 256"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          },
+          "deviceId": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          }
+        }
+      }
+    },
+    "systemNotices": {
+      ".read": "(auth != null && (auth.token.admin === true || root.child('profiles/stores').child(auth.uid).exists() || root.child('profiles/couriers').child(auth.uid).exists())) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      ".write": false,
+      ".indexOn": [
+        "createdAt"
+      ]
+    },
+    "rainSignals": {
+      ".read": "(auth != null && auth.token.admin === true) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+      ".write": false
+    },
+    "pushUpdateRetries": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": [
+        "nextAt"
+      ]
+    },
+    "courierOffers": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid || (auth != null && auth.token.admin === true)) && (auth != null && (auth.token.admin === true || (root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved'))))",
+        ".write": false
+      }
+    },
+    "returnTimers": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": [
+        "until"
+      ]
+    },
+    "deliveryProofs": {
+      "$orderId": {
+        ".read": "auth != null && (auth.token.admin === true || (root.child('orders').child($orderId).child('storeId').val() === auth.uid && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('orders').child($orderId).child('courierId').val() === auth.uid && root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved')))",
+        ".write": false
+      }
+    },
+    "orderOccurrences": {
+      "$orderId": {
+        ".read": "auth != null && (auth.token.admin === true || (root.child('orders').child($orderId).child('storeId').val() === auth.uid && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('orders').child($orderId).child('courierId').val() === auth.uid && root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved')) || (root.child('orders').child($orderId).child('routeStoreIds').child(auth.uid).val() === true && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')))",
+        ".write": false
+      }
+    },
+    "orderRatings": {
+      "$orderId": {
+        "store": {
+          ".read": "auth != null && (auth.token.admin === true || (root.child('orders').child($orderId).child('storeId').val() === auth.uid && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')) || (data.exists() && root.child('orderRatings').child($orderId).child('courier').exists() && root.child('orders').child($orderId).child('courierId').val() === auth.uid && root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved')))",
+          ".write": false
+        },
+        "courier": {
+          ".read": "auth != null && (auth.token.admin === true || (root.child('orders').child($orderId).child('courierId').val() === auth.uid && root.child('profiles/couriers').child(auth.uid).exists() && (!root.child('profiles/couriers').child(auth.uid).child('accessStatus').exists() || root.child('profiles/couriers').child(auth.uid).child('accessStatus').val() === 'approved')) || (data.exists() && root.child('orderRatings').child($orderId).child('store').exists() && root.child('orders').child($orderId).child('storeId').val() === auth.uid && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')))",
+          ".write": false
+        }
+      }
+    },
+    "ratingSummaries": {
+      "$role": {
+        "$uid": {
+          ".read": "auth != null && (auth.token.admin === true || auth.uid === $uid)",
+          ".write": false
+        }
+      }
+    },
+    "storeCustomers": {
+      "$uid": {
+        "$phone": {
+          ".read": "auth != null && auth.uid === $uid && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')",
+          ".write": "auth != null && auth.uid === $uid && root.child('profiles/stores').child(auth.uid).exists() && (!root.child('profiles/stores').child(auth.uid).child('accessStatus').exists() || root.child('profiles/stores').child(auth.uid).child('accessStatus').val() === 'approved')",
+          ".validate": "newData.hasChildren(['phone','name','street','number','neighborhood','reference','city','zone','revision','updatedAt']) && $phone.matches(/^55[1-9][0-9]{9,10}$/) && ((!data.exists() && newData.child('revision').val() === 1) || (data.exists() && newData.child('revision').val() === data.child('revision').val() + 1))",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 160 && newData.val().length > 0"
+          },
+          "street": {
+            ".validate": "newData.isString() && newData.val().length <= 160 && newData.val().length > 0"
+          },
+          "number": {
+            ".validate": "newData.isString() && newData.val().length <= 160 && newData.val().length > 0"
+          },
+          "neighborhood": {
+            ".validate": "newData.isString() && newData.val().length <= 120 && newData.val().length > 0"
+          },
+          "reference": {
+            ".validate": "newData.isString() && newData.val().length <= 160"
+          },
+          "city": {
+            ".validate": "newData.isString() && newData.val().length <= 120 && newData.val().length > 0"
+          },
+          "zone": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "phone": {
+            ".validate": "newData.isString() && newData.val() === $phone"
+          },
+          "revision": {
+            ".validate": "newData.isNumber()"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() >= now - 60000 && newData.val() <= now + 60000"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    }
+  }
+}
