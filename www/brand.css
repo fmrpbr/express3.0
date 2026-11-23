@@ -35,11 +35,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 }
 body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .app { background: var(--surface); }
-.login-screen { background: #081e2b; }
-.login-layout { width: min(100%, 960px); margin: auto; }
-.login-intro { display: none; }
-.login-card { background: var(--surface); width: 100%; }
-.login-settings { display: flex; align-items: end; justify-content: space-between; gap: 12px; color: var(--muted); }
+.login-screen { background: var(--paper); }
+.login-layout {
+  width: min(100%, 450px);
+  margin: auto;
+  padding: clamp(10px, 3.3vw, 17px);
+  border-radius: 28px;
+  background: #081e2b;
+}
+.login-card { background: var(--surface); width: 100%; box-shadow: none; }
+.login-version { display: block; text-align: center; color: var(--muted); font-size: 12px; }
 .appearance-control { display: grid; gap: 3px; font-size: 11px; font-weight: 700; }
 .appearance-control select {
   min-height: 34px;
@@ -72,16 +77,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .order-itinerary { display: grid; gap: 5px; margin: 9px 0; }
 .order-itinerary span { min-width: 0; overflow-wrap: anywhere; }
 .order-itinerary b { color: var(--muted); margin-inline-end: 4px; }
-.order-estimates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; border-radius: 10px; background: var(--bluebg); color: var(--blue); }
-.order-estimates > div { display: grid; gap: 2px; padding: 8px 10px; min-width: 0; }
-.order-estimates > div + div { border-inline-start: 1px solid currentColor; }
-
 @media (min-width: 900px) {
-  .login-layout { display: grid; grid-template-columns: 1fr minmax(0, 460px); align-items: center; gap: 64px; }
-  .login-intro { display: block; color: #f5f9fc; }
-  .login-intro img { border-radius: 22px; }
-  .login-intro p { color: #a6c0d1; margin: 22px 0 8px; font-weight: 650; }
-  .login-intro h2 { margin: 0; max-width: 13ch; font-size: clamp(40px, 6vw, 66px); font-weight: 800; line-height: 1.04; letter-spacing: -.055em; }
   .side { width: 224px; overflow-y: auto; }
   .content { width: calc(100% - 42px); }
   .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -161,10 +157,11 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .hero-stat small { font-size: clamp(7px, 2.1vw, 10px); white-space: nowrap; }
 .store-overview h1 { overflow-wrap: anywhere; }
 .store-overview h1.long-store-name { font-size: clamp(20px, 4vw, 26px); }
-.order-compact .order-top .id { margin-top: 6px; }
+.order-caption { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+.order-label, .order-value small { color: var(--muted); font-size: 10px; text-transform: uppercase; }
 .order-compact .order-top h3 { overflow-wrap: anywhere; }
 .order-compact .order-value { flex: 0 0 auto; text-align: right; }
-.order-compact .order-value small { color: var(--muted); }
+.order-compact .offer-value .fee { color: var(--green-dark); }
 .order-compact .order-value .fee { margin-top: 0; }
 .order-route {
   display: grid;
@@ -177,9 +174,12 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 }
 .order-route.with-metric { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 .order-route .order-itinerary { margin: 0; gap: 10px; }
-.order-point { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.order-point { display: grid; position: relative; gap: 2px; padding-inline-start: 17px; overflow-wrap: anywhere; }
+.order-point::before { content: ""; position: absolute; top: 20px; left: 0; width: 7px; height: 7px; border: 2px solid #60dba4; border-radius: 50%; }
+.order-point[data-point="destination"]::before { border-color: #ff7587; }
 .order-point small, .order-route .order-estimates small { color: #b9cdda; }
-.order-route .order-point b { margin: 0; color: inherit; font-size: 15px; }
+.order-point small { text-transform: uppercase; font-size: 10px; }
+.order-route .order-point b { margin: 0; color: inherit; font-size: clamp(14px, 4vw, 20px); line-height: 1.15; text-transform: uppercase; }
 .order-route .order-point span { font-size: 12px; }
 .order-route .order-estimates {
   display: grid;
@@ -196,6 +196,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   overflow-wrap: anywhere;
 }
 .order-route .order-estimates b { font-size: 13px; }
+.order-route .order-estimates .pickup-distance { font-size: clamp(17px, 5vw, 25px); line-height: 1.15; }
 .order-flags { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0; }
 .order-details { margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
 .order-details summary { cursor: pointer; font-weight: 700; min-height: 32px; align-content: center; }
@@ -211,7 +212,6 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .sheet-footer .btn { min-height: 44px; }
 .overview-stat { display: grid; text-align: start; color: var(--ink); }
 .overview-stat:hover { border-color: var(--primary); }
-.login-settings [data-app-version] { margin-inline-start: auto; }
 .selectors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px; }
 .account-menu { position: relative; }
 .account-menu summary { cursor: pointer; list-style: none; }

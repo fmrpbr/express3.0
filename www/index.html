@@ -370,11 +370,6 @@
 <!-- Tela de Login -->
 <div id="login-screen" class="login-screen">
   <div class="login-layout">
-    <div class="login-intro">
-      <img src="./icons/icon-192.png" alt="" width="96" height="96">
-      <p>Express Entregas</p>
-      <h2>Entregas para sua loja, em Aracruz.</h2>
-    </div>
   <div class="login-card">
     <div class="login-brand">
       <div class="logo"><img src="./icons/icon-192.png" alt=""></div>
@@ -413,7 +408,7 @@
       <div class="field full">
         <label for="auth-password">Senha</label>
         <div class="pwd-box">
-          <input type="password" id="auth-password" required autocomplete="current-password" placeholder="••••••••">
+          <input type="password" id="auth-password" required autocomplete="current-password" placeholder="Digite sua senha">
           <button type="button" class="pwd-toggle" data-toggle-password aria-label="Mostrar ou ocultar senha">👁</button>
         </div>
       </div>
@@ -451,18 +446,16 @@
       <details id="login-help"><summary>Ajuda</summary>
         <button type="button" class="login-link" data-action="open-first-password">Definir minha primeira senha</button>
         <button type="button" class="login-link" id="admin-entry-button" data-admin-login>Acesso administrativo</button>
+        <label class="appearance-control">Aparência
+          <select data-appearance-select>
+            <option value="auto">Automático</option>
+            <option value="light">Claro</option>
+            <option value="dark">Escuro</option>
+          </select>
+        </label>
       </details>
     </div>
-    <div class="login-settings">
-      <label class="appearance-control">Aparência
-        <select data-appearance-select>
-          <option value="auto">Automático</option>
-          <option value="light">Claro</option>
-          <option value="dark">Escuro</option>
-        </select>
-      </label>
-      <small data-app-version>Versão 3.0.0</small>
-    </div>
+    <small class="login-version" data-app-version>Express Entregas · Versão 3.0.0</small>
   </div>
   </div>
 </div>
@@ -2042,13 +2035,13 @@
     const courierOffer = role === 'courier' && isOffer(o);
     const courierRunning = role === 'courier' && o.status === 'run';
     const clientPoint = { area: o.clientNeighborhood || o.city || 'Cliente', address: locationLine };
-    const storePoint = { area: o.storeNeighborhood || o.storeName || 'Loja', address: esc(o.storeAddress || '') };
+    const storePoint = { area: o.storeNeighborhood || 'Bairro da loja não informado', address: esc(o.storeAddress || '') };
     const startsAtClient = o.serviceType === 'collection' || (o.serviceType === 'roundtrip' && tripStage < 2);
     const endsAtStore = o.serviceType === 'collection' || (o.serviceType === 'roundtrip' && tripStage < 2);
     const origin = startsAtClient ? clientPoint : storePoint;
     const destination = endsAtStore ? storePoint : clientPoint;
     const showAddress = !courierOffer;
-    const point = (label, data) => `<div class="order-point"><small>${label}</small><b>${esc(data.area)}</b>${showAddress && data.address ? '<span>' + data.address + '</span>' : ''}</div>`;
+    const point = (label, data) => `<div class="order-point" data-point="${label === 'Destino' ? 'destination' : 'origin'}"><small>${label}</small><b>${esc(data.area)}</b>${showAddress && data.address ? '<span>' + data.address + '</span>' : ''}</div>`;
     const pickupStage = o.serviceType === 'roundtrip' ? tripStage === 0 || tripStage === 2 : !o.picked;
     const showOrigin = role === 'courier' && (!courierRunning || pickupStage);
     const enRouteToPickup = courierRunning && pickupStage;
@@ -2059,9 +2052,10 @@
     const estimate = route?.estimate;
     const distance = estimate ? (estimate.meters / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " km" : "";
     const metric = courierOffer
-      ? '<small>Até a retirada</small>' + (estimate
-        ? '<b>' + distance + '</b><small>~ ' + Math.ceil(estimate.seconds / 60) + ' min</small><small class="maps-attribution">Google Maps</small>'
-        : '<b>' + (route?.loading ? 'Calculando…' : 'Sem estimativa') + '</b>')
+      ? (estimate
+        ? '<b class="pickup-distance">' + distance + '</b><small>~ ' + Math.ceil(estimate.seconds / 60) + ' min</small>'
+        : '<b>' + (route?.loading ? 'Calculando…' : 'Sem estimativa') + '</b>') +
+        '<small>Até a retirada</small>' + (estimate ? '<small class="maps-attribution">Google Maps</small>' : '')
       : enRouteToPickup && o.serviceType !== 'roundtrip' && pickupRemaining !== null
         ? '<small>Prazo para coleta</small><b>' + pickupRemaining + ' min</b>'
         : '';
@@ -2084,8 +2078,9 @@
       ? `<div class="running-summary"><div><small>Em execução</small><b>${elapsedLabel(serverNow() - Number(o.accepted || serverNow()))}</b></div><div><small>Etapa atual</small><b>${esc(st)}</b></div></div>`
       : (creationTimerHtml || runDurationHtml || storePickup ? '<div class="meta">' + creationTimerHtml + ' ' + runDurationHtml + storePickup + '</div>' : '');
     return `<article data-order-id="${esc(o.id)}" class="order order-compact ${queueClass}">
-      <div class="order-top"><div><span class="tag ${courierOffer && o.status === 'open' ? 'green' : tag}">${courierOffer && o.status === 'open' ? 'Disponível' : st}</span><div class="id">${esc(o.orderCode || o.id)} · ${date(o.created)}</div><h3>${esc(courierOffer || courierRunning ? o.storeName || 'Loja solicitante' : serviceTypeLabel(o.serviceType).split(' (')[0])}</h3></div>
-      <div class="order-value"><small>${courierRunning ? 'Valor da corrida' : 'Valor'}</small><div class="fee">${o.status === "cotacao" ? "A definir" : cash(o.fee)}</div></div></div>
+      <div class="order-caption"><span class="tag ${courierOffer && o.status === 'open' ? 'green' : tag}">${courierOffer && o.status === 'open' ? 'Disponível' : st}</span><span class="id">${esc(o.orderCode || o.id)} · ${date(o.created)}</span></div>
+      <div class="order-top"><div>${courierOffer || courierRunning ? '<small class="order-label">Loja solicitante</small>' : ''}<h3>${esc(courierOffer || courierRunning ? o.storeName || 'Loja solicitante' : serviceTypeLabel(o.serviceType).split(' (')[0])}</h3></div>
+      <div class="order-value${courierOffer ? ' offer-value' : ''}"><small>${courierRunning ? 'Valor da corrida' : 'Valor'}</small><div class="fee">${o.status === "cotacao" ? "A definir" : cash(o.fee)}</div></div></div>
       ${itinerary}${locationControl}${queueBadge}${timing}
       ${tags || courierOffer ? '<div class="order-flags">' + serviceBadge + tags + '</div>' : ''}
       ${courierOffer ? '' : careDetails(o)}${returnControls(o)}${trackingShareHtml}${bidsHtml}${gpsTrackingInfo}${contacts}
