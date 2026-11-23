@@ -45,6 +45,9 @@ function publicOrder(order) {
   const result = {};
   for (const field of ["orderCode", "status", "serviceType", "serviceDate", "city", "clientNeighborhood", "neighborhood", "selectedZone", "fee", "created", "updatedAt", "revision", "fragile", "importantNotes", "kind", "deliveryCount", "completedStops", "routeValues", "priorityUntil", "roundtripSchema", "legNumber", "roundtripTotalFee", "offerCreatedAt"])
     if (order[field] !== undefined) result[field] = order[field];
+  for (const field of ["storeName", "storeNeighborhood"]) {
+    if (order[field]) result[field] = order[field];
+  }
   return result;
 }
 function eligibleOrder(order, now) {
@@ -241,6 +244,7 @@ function applyCommand(original, auth, command, context) {
     fail(who, "Perfil não encontrado.", "permission-denied");
     const entry = { ...state.profiles[who.role === "store" ? "stores" : "couriers"][uid], name: text(input.name, 80, true), phone: text(input.phone, 30, true), address: text(input.address, 300, true) };
     fail(entry.phone.replace(/\D/g, "").length >= 10, "Telefone inválido.");
+    if (who.role === "store" && input.neighborhood !== undefined) entry.neighborhood = text(input.neighborhood, 100);
     put(state, `profiles/${who.role === "store" ? "stores" : "couriers"}/${uid}`, entry);
   } else if (action === "savePix") {
     fail(who?.role === "courier", "Somente o motoboy altera sua chave Pix.", "permission-denied");
@@ -359,6 +363,8 @@ function applyCommand(original, auth, command, context) {
       id ||= newId;
       order ||= { orderCode: `${quote ? "COT" : "EXP"}-${id.slice(-8).toUpperCase()}`, storeId: uid, created: now, createdBy: uid, paid: false, revision: 0, schemaVersion: 2, offerGeneration: 0 };
       Object.assign(order, fields, { storeName: who.name, storeAddress: who.address, status: quote ? "cotacao" : "open" });
+      if (who.neighborhood) order.storeNeighborhood = who.neighborhood;
+      else delete order.storeNeighborhood;
       if(completing || order.agreedFee) order.fee=order.agreedFee;
       else if(quote) order.fee=0;
       else if(!previous) {

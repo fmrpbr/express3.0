@@ -276,12 +276,21 @@
 
   function setAuthTabLocal(mode){
     window.__expressAuthMode = mode;
+    var registering = mode === "register";
+    document.getElementById("login-role-tabs").hidden = !registering;
+    document.getElementById("login-heading").textContent = registering ? "Crie sua conta" : "Bem-vindo de volta!";
+    document.getElementById("login-description").textContent = registering ? "Escolha seu perfil para começar." : "Acesse sua conta para continuar.";
     var l = document.getElementById("tab-login"), rg = document.getElementById("tab-register");
     if(l) l.className = "auth-tab " + (mode === "login" ? "active" : "");
     if(rg) rg.className = "auth-tab " + (mode === "register" ? "active" : "");
+    l.hidden = !registering;
+    rg.hidden = registering;
+    document.getElementById("login-account-prompt").textContent = registering ? "Já tem conta?" : "Ainda não tem conta?";
+    var note = document.getElementById("registration-entry-note");
+    if (note) note.hidden = !registering;
     var fn = document.getElementById("field-name"), btn = document.getElementById("auth-submit-btn");
     if(fn) fn.style.display = mode === "register" ? "grid" : "none";
-    if(btn) btn.textContent = mode === "register" ? "Criar Conta Express →" : "Acessar Painel Express →";
+    if(btn) btn.textContent = mode === "register" ? "Criar conta →" : "Entrar na plataforma →";
   }
 
   function togglePasswordLocal(){
@@ -371,18 +380,18 @@
       <div class="logo"><img src="./icons/icon-192.png" alt=""></div>
       <div>
         <h1>Express Entregas</h1>
-        <small>Exclusivo para Lojistas e Motoboys</small>
+        <small>Conectando quem vende a quem entrega.</small>
       </div>
     </div>
 
-    <div class="role-tabs" id="login-role-tabs">
-      <button type="button" class="role-btn active" id="btn-login-store" data-login-role="store">🏪 Lojista</button>
-      <button type="button" class="role-btn" id="btn-login-courier" data-login-role="courier">🏍 Motoboy</button>
+    <div class="login-heading">
+      <h2 id="login-heading">Bem-vindo de volta!</h2>
+      <p id="login-description">Acesse sua conta para continuar.</p>
     </div>
 
-    <div class="auth-mode" id="login-auth-tabs">
-      <button type="button" class="auth-tab active" id="tab-login" data-auth-tab="login">Entrar</button>
-      <button type="button" class="auth-tab" id="tab-register" data-auth-tab="register">Criar Conta</button>
+    <div class="role-tabs" id="login-role-tabs" hidden>
+      <button type="button" class="role-btn active" id="btn-login-store" data-login-role="store">🏪 Lojista</button>
+      <button type="button" class="role-btn" id="btn-login-courier" data-login-role="courier">🏍 Motoboy</button>
     </div>
 
     <section id="admin-login-panel" class="info" hidden>
@@ -397,12 +406,12 @@
       </div>
 
       <div class="field full">
-        <label>E-mail</label>
+        <label for="auth-email">E-mail</label>
         <input type="email" id="auth-email" required autocomplete="username" placeholder="seuemail@exemplo.com">
       </div>
 
       <div class="field full">
-        <label>Senha</label>
+        <label for="auth-password">Senha</label>
         <div class="pwd-box">
           <input type="password" id="auth-password" required autocomplete="current-password" placeholder="••••••••">
           <button type="button" class="pwd-toggle" data-toggle-password aria-label="Mostrar ou ocultar senha">👁</button>
@@ -414,12 +423,16 @@
         <input type="tel" id="auth-extra" placeholder="(27) 99999-9999">
       </div>
 
-      <button type="submit" class="btn primary full" style="margin-top:10px;" id="auth-submit-btn">Acessar Painel Express →</button>
+      <button type="button" class="login-link password-link" data-action="open-password-recovery">Esqueceu sua senha?</button>
+      <button type="submit" class="btn primary full" id="auth-submit-btn">Entrar na plataforma →</button>
     </form>
     <div id="auth-feedback" role="status" aria-live="polite"></div>
     <div class="password-actions" id="login-password-actions">
-      <button type="button" class="btn secondary full" data-action="open-password-recovery">Esqueci minha senha</button>
-      <button type="button" class="btn secondary full" data-action="open-first-password">Definir minha primeira senha</button>
+      <div class="login-account" id="login-auth-tabs">
+        <span id="login-account-prompt">Ainda não tem conta?</span>
+        <button type="button" class="login-link auth-tab active" id="tab-login" data-auth-tab="login" hidden>Entrar</button>
+        <button type="button" class="login-link auth-tab" id="tab-register" data-auth-tab="register">Criar conta</button>
+      </div>
     </div>
     <section id="password-recovery-panel" hidden>
       <h2 id="recovery-title">Recuperar senha</h2>
@@ -432,7 +445,14 @@
       <p style="font-size:12px">A senha será definida no link enviado pelo Firebase. Este processo não cria uma conta nem concede acesso de administrador.</p>
       <button type="button" class="btn secondary full" data-action="recovery-back">Voltar para entrar</button>
     </section>
-    <p style="text-align:center;font-size:12px;margin:16px 0"><a href="./cadastro/" style="color:var(--red-dark)">Conheça o Express Entregas</a> · <a href="https://express-v2-web-fmrpbr.web.app/download/" style="color:var(--red-dark)">Baixar aplicativo</a></p>
+    <div class="login-links">
+      <a href="./cadastro/">Conhecer a plataforma</a>
+      <a href="https://express-v2-web-fmrpbr.web.app/download/">Baixar aplicativo</a>
+      <details id="login-help"><summary>Ajuda</summary>
+        <button type="button" class="login-link" data-action="open-first-password">Definir minha primeira senha</button>
+        <button type="button" class="login-link" id="admin-entry-button" data-admin-login>Acesso administrativo</button>
+      </details>
+    </div>
     <div class="login-settings">
       <label class="appearance-control">Aparência
         <select data-appearance-select>
@@ -443,7 +463,6 @@
       </label>
       <small data-app-version>Versão 3.0.0</small>
     </div>
-    <button type="button" id="admin-entry-button" class="btn secondary full" style="margin-top:15px; width:100%" data-admin-login>🔒 Entrar como Administrador</button>
   </div>
   </div>
 </div>
@@ -507,10 +526,13 @@
           </div>
         </div>
 
-        <div class="field full" id="field-service-date">
-          <label>Data prevista do serviço</label>
-          <input type="date" name="serviceDate" id="service-date" required>
-        </div>
+        <details id="service-date-options" open>
+          <summary>Agendar para outra data</summary>
+          <div class="field full" id="field-service-date">
+            <label for="service-date">Data prevista do serviço</label>
+            <input type="date" name="serviceDate" id="service-date" required>
+          </div>
+        </details>
 
         <div class="field full" id="field-zone" style="margin-top:5px; background:var(--paper); padding:10px; border-radius:12px;">
           <label>Região / Taxa Específica</label>
@@ -637,9 +659,14 @@
         </label>
         <label class="selectbox"><small>PERFIL</small><select id="role" disabled></select></label>
         <label class="selectbox"><small id="actor-label">USUÁRIO</small><select id="actor"></select></label>
-        <button type="button" id="avatar" class="avatar" data-nav="profile" aria-label="Meu perfil">EE</button>
+        <details class="account-menu">
+          <summary id="avatar" class="avatar" aria-label="Menu da conta">EE</summary>
+          <div class="account-options">
+            <button type="button" class="btn secondary tiny" id="account-profile-link" data-nav="profile">Minha conta</button>
+            <button type="button" class="btn danger tiny" data-logout>Sair</button>
+          </div>
+        </details>
         <button type="button" class="btn secondary tiny" data-enable-push title="Ativar notificações">🔔</button>
-        <button type="button" class="btn danger tiny" data-logout style="margin-left:6px">Sair</button>
       </div>
     </header>
 
@@ -857,6 +884,7 @@
   let unsubscribers = [];
   let orderSources = new Map();
   const carePreviews = new Map();
+  let pickupRoute = null;
   let pendingProfileWrite = null;
   let sessionInitPromise = null;
   let activeSessionUid = null;
@@ -1010,12 +1038,9 @@
 
   window.setAuthTab = function(mode) {
     currentAuthMode = mode; window.__expressAuthMode = mode;
+    window.__expressUI.setAuthTab(mode);
     setAuthFeedback("", "info");
-    document.getElementById("tab-login").className = "auth-tab " + (mode === "login" ? "active" : "");
-    document.getElementById("tab-register").className = "auth-tab " + (mode === "register" ? "active" : "");
-    document.getElementById("field-name").style.display = mode === "register" ? "grid" : "none";
     document.getElementById("field-extra").style.display = mode === "register" ? "grid" : "none";
-    document.getElementById("auth-submit-btn").textContent = mode === "register" ? "Criar Conta Express →" : "Acessar Painel Express →";
   };
 
   window.togglePassword = function() {
@@ -1029,10 +1054,11 @@
     document.getElementById('login-password-actions').hidden=false;
     document.getElementById('auth-feedback').hidden=false;
     document.getElementById('admin-login-panel').hidden=!adminLoginMode;
-    document.getElementById('login-role-tabs').hidden=adminLoginMode;
+    document.querySelector('.login-heading').hidden=adminLoginMode;
+    document.getElementById('login-role-tabs').hidden=adminLoginMode||currentAuthMode!=='register';
     document.getElementById('login-auth-tabs').hidden=adminLoginMode;
     document.getElementById('admin-entry-button').hidden=adminLoginMode;
-    document.getElementById('auth-submit-btn').textContent=adminLoginMode?'Entrar como Administrador':currentAuthMode==='register'?'Criar Conta Express →':'Acessar Painel Express →';
+    document.getElementById('auth-submit-btn').textContent=adminLoginMode?'Entrar como Administrador':currentAuthMode==='register'?'Criar conta →':'Entrar na plataforma →';
   }
 
   function openPasswordRecovery(first=false){
@@ -1041,6 +1067,7 @@
     document.getElementById('auth-password').value='';
     document.getElementById('recovery-email').value=document.getElementById('auth-email').value.trim();
     document.getElementById('auth-form').hidden=true;
+    document.querySelector('.login-heading').hidden=true;
     document.getElementById('login-password-actions').hidden=true;
     document.getElementById('auth-feedback').hidden=true;
     document.getElementById('login-role-tabs').hidden=true;
@@ -1116,6 +1143,7 @@
   }
 
   function stopDataListeners() {
+    stopPickupRoute();
     logisticsReady=false;logisticsChecked=false;prioritySubscribed=false;routeSelection=[];addingRouteDelivery=false;joiningRouteId='';tutorialOpen=false;tutorialDismissed=false;
     adminHealth={};adminLastDataAt=0;adminConnected=false;adminServerOffset=0;adminFilters=window.ExpressAdmin.defaults();adminPage=0;adminSelectedOrderId=null;
     tariffConfig={};cityConfigs={};integrationConfigs={};offerSettings={enabled:false,couriersPerRound:3,responseSeconds:30,maxRounds:3};systemNotices=[];rainSignals={};
@@ -1459,7 +1487,7 @@
       setAuthFeedback(authError(err), "error");
     } finally {
       busy = false; submit.disabled = false;
-      submit.textContent = currentAuthMode === "register" ? "Criar Conta Express →" : "Acessar Painel Express →";
+      submit.textContent = currentAuthMode === "register" ? "Criar conta →" : "Entrar na plataforma →";
     }
   });
 
@@ -1530,6 +1558,9 @@
     document.getElementById("service-type-select").value = (o.roundtripSchema&&o.legNumber===1?"roundtrip":o.serviceType) || "delivery";
     document.getElementById("quote-city").value = o.city || "";
     document.getElementById("service-date").value = o.serviceDate || localDateInputValue();
+    if (o.status === "cotacao" && o.serviceDate && o.serviceDate !== localDateInputValue()) {
+      document.getElementById("service-date-options").open = true;
+    }
     document.getElementById("inp-client").value = o.client || "";
     document.getElementById("inp-phone").value = o.phone || "";
     document.getElementById("inp-street").value = o.clientStreet || "";
@@ -1550,6 +1581,9 @@
   window.__express.prepareSheet = prepareSheet;
 
   function configureOrderFormMode(isQuote, completing){
+    const dateOptions = document.getElementById("service-date-options");
+    dateOptions.open = !isQuote;
+    dateOptions.querySelector("summary").hidden = !isQuote;
     const frozen=!isQuote&&!completing&&!!document.getElementById('edit-order-id').value;
     ['zone-select-mobile','payment-select-mobile','chk-bag-mob','chk-bank-mob'].forEach(id=>{document.getElementById(id).disabled=frozen;});
     ["field-street","field-number","field-reference","field-client","field-phone","field-payment","field-zone","field-notes","section-addons"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isQuote?"none":"";});
@@ -1936,12 +1970,11 @@
     const totalDuration = Number.isFinite(storedTotal) ? storedTotal : Math.max(0, Number(o.completed || serverNow()) - createdAt);
     const creationTimerHtml = hasCreatedAt && !["cancelled", "cancelado_cotacao"].includes(o.status)
       ? `<span style="font-size:11px;font-weight:700;color:var(--muted);">⏱️ ${o.status==="done"?"Tempo total":"Desde a criação"}: ${elapsedLabel(o.status==="done"?totalDuration:serverNow()-createdAt)}</span>` : "";
-    let pickupTimerHtml = "";
+
     let canCancelFree = false;
     if (o.status === "run" && !o.picked && o.accepted) {
       let remainingMinutes = 25 - Math.floor((Date.now() - o.accepted) / 60000);
-      if (remainingMinutes > 0) pickupTimerHtml = `<span style="font-size:11px; color:var(--green-dark); font-weight:bold;">⏱️ Chegada: ${remainingMinutes} min</span>`;
-      else { pickupTimerHtml = `<span style="font-size:11px; color:var(--red); font-weight:bold;">⚠️ Limite 25 min excedido!</span>`; canCancelFree = true; }
+      canCancelFree = remainingMinutes <= 0;
     }
 
     if (role === "store" && (o.status === "open" || o.status === "cotacao" || o.status === "cotacao_aceita")) {
@@ -2006,21 +2039,59 @@
     let clientLine = (isSpecialQuote || (role === "courier" && !o.courierId)) ? "Cotação especial · sem dados do cliente nesta etapa" : "Cliente: <b>"+esc(o.client)+"</b> "+(o.phone ? "("+esc(o.phone)+")" : "");
     let serviceBadge = o.serviceType === "collection" ? '<span class="tag orange">🔄 RECOLHA</span>' : o.serviceType === "roundtrip" ? '<span class="tag purpletag">🔁 2 VIAGENS</span>' : '<span class="tag bluetag">🚚 ENTREGA</span>';
 
-    const clientAddress = locationLine || esc(o.address || o.clientNeighborhood || 'Endereço após o aceite');
-    const storeAddress = esc(o.storeAddress || o.storeName || 'Loja · endereço após o aceite');
-    const collection = o.serviceType === 'collection' || o.serviceType === 'roundtrip';
-    const origin = collection ? clientAddress : storeAddress;
-    const destination = collection ? storeAddress : clientAddress;
-    const itinerary = !isSpecialQuote && (role === 'courier' || role === 'store')
-      ? '<div class="order-itinerary">' +
-        (role === 'courier' ? '<span><b>Origem</b> ' + origin + '</span>' : '') +
-        '<span><b>Destino</b> ' + destination + '</span></div>'
-      : '<h3>📍 ' + locationLine + '</h3>';
-    const estimates = role === 'courier' && isOffer(o)
-      ? '<div class="order-estimates"><div><small>Distância</small><b>Sem estimativa</b></div><div><small>Tempo previsto</small><b>Sem estimativa</b></div></div>'
+    const courierOffer = role === 'courier' && isOffer(o);
+    const courierRunning = role === 'courier' && o.status === 'run';
+    const clientPoint = { area: o.clientNeighborhood || o.city || 'Cliente', address: locationLine };
+    const storePoint = { area: o.storeNeighborhood || o.storeName || 'Loja', address: esc(o.storeAddress || '') };
+    const startsAtClient = o.serviceType === 'collection' || (o.serviceType === 'roundtrip' && tripStage < 2);
+    const endsAtStore = o.serviceType === 'collection' || (o.serviceType === 'roundtrip' && tripStage < 2);
+    const origin = startsAtClient ? clientPoint : storePoint;
+    const destination = endsAtStore ? storePoint : clientPoint;
+    const showAddress = !courierOffer;
+    const point = (label, data) => `<div class="order-point"><small>${label}</small><b>${esc(data.area)}</b>${showAddress && data.address ? '<span>' + data.address + '</span>' : ''}</div>`;
+    const pickupStage = o.serviceType === 'roundtrip' ? tripStage === 0 || tripStage === 2 : !o.picked;
+    const showOrigin = role === 'courier' && (!courierRunning || pickupStage);
+    const enRouteToPickup = courierRunning && pickupStage;
+    const pickupRemaining = o.accepted ? Math.max(0, 25 - Math.floor((serverNow() - Number(o.accepted)) / 60000)) : null;
+    const storePickup = role === 'store' && o.status === 'run' && !o.picked && pickupRemaining !== null
+      ? '<span>Prazo para coleta: ' + (pickupRemaining ? pickupRemaining + ' min' : 'excedido') + '</span>' : '';
+    const route = pickupRoute?.orderId === o.id && pickupRoute.revision === o.revision ? pickupRoute : null;
+    const estimate = route?.estimate;
+    const distance = estimate ? (estimate.meters / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " km" : "";
+    const metric = courierOffer
+      ? '<small>Até a retirada</small>' + (estimate
+        ? '<b>' + distance + '</b><small>~ ' + Math.ceil(estimate.seconds / 60) + ' min</small><small class="maps-attribution">Google Maps</small>'
+        : '<b>' + (route?.loading ? 'Calculando…' : 'Sem estimativa') + '</b>')
+      : enRouteToPickup && o.serviceType !== 'roundtrip' && pickupRemaining !== null
+        ? '<small>Prazo para coleta</small><b>' + pickupRemaining + ' min</b>'
+        : '';
+    const itinerary = isSpecialQuote
+      ? '<h3>' + locationLine + '</h3>'
+      : `<div class="order-route${metric ? ' with-metric' : ''}"><div class="order-itinerary">${showOrigin ? point(courierRunning ? 'Retirada' : 'Origem', origin) : ''}${point('Destino', destination)}</div>${metric ? '<div class="order-estimates">' + metric + '</div>' : ''}</div>`;
+    const tags = [o.fragile ? '<span class="tag orange">Frágil</span>' : '', o.importantNotes ? '<span class="tag orange">Observação</span>' : ''].join('');
+    const locationControl = courierOffer && firebaseConfig.routeEstimatesEnabled === true
+      ? `<div class="route-estimate-controls"><button type="button" class="btn secondary tiny" data-action="pickup-route" data-id="${esc(o.id)}">${route?.timer ? 'Parar atualização' : 'Calcular trajeto de moto'}</button>
+        <small>${esc(route?.error || 'Usa sua localização e o endereço de retirada no Google Maps.')}</small></div>` : '';
+    const contacts = o.status === "run" && ((role === "store" && o.storeId === actor) || (role === "courier" && o.courierId === actor))
+      ? `<div class="buttons order-contacts">${(role === "store" ? [["courier", "Motoboy"]] : [["store", "Loja"], ["customer", "Cliente"]])
+        .map(([target, label]) => `<button type="button" class="btn soft tiny" data-action="order-contact" data-id="${esc(o.id)}" data-contact="${target}">WhatsApp · ${label}</button>`).join('')}</div>`
       : '';
-    const returnHtml=returnControls(o);
-    return '<article data-order-id="'+esc(o.id)+'" class="order '+queueClass+'"><div class="order-top"><div><div class="id">'+esc(o.orderCode || o.id)+' · '+date(o.created)+' '+serviceBadge+'</div>'+itinerary+'<div class="order-store">'+clientLine+'</div></div><div style="text-align:right"><span class="tag '+tag+'">'+st+'</span><div class="fee">'+(o.status==="cotacao"?"A definir":cash(o.fee))+'</div></div></div>'+queueBadge+estimates+'<div class="meta"><span>📅 Data: '+esc(formatServiceDate(o.serviceDate))+'</span><span>🔧 Serviço: '+esc(serviceTypeLabel(o.serviceType))+'</span><span>🏪 Loja: '+esc(o.storeName)+'</span><span>♙ Motoboy: '+esc(o.courierName||"Aguardando")+'</span>'+' '+creationTimerHtml+' '+pickupTimerHtml+' '+runDurationHtml+'</div>'+returnHtml+careDetails(o)+trackingShareHtml+bidsHtml+gpsTrackingInfo+(o.status === "done" ? paymentDetails(o) : '')+recordActions(o)+'<div class="footer"><div class="buttons">'+action+'</div></div></article>';
+    const details = `<details class="order-details" data-order-details="${esc(o.id)}"><summary>${courierRunning ? 'Dados do cliente e do serviço' : 'Ver detalhes'}</summary>
+      ${courierOffer ? '' : '<div class="order-store">' + clientLine + '</div>'}
+      <div class="meta"><span>Data: ${esc(formatServiceDate(o.serviceDate))}</span><span>${esc(serviceTypeLabel(o.serviceType))}</span>${o.courierName ? '<span>Motoboy: ' + esc(o.courierName) + '</span>' : ''}</div>
+      ${courierOffer ? careDetails(o) : ''}</details>`;
+    const timing = courierRunning
+      ? `<div class="running-summary"><div><small>Em execução</small><b>${elapsedLabel(serverNow() - Number(o.accepted || serverNow()))}</b></div><div><small>Etapa atual</small><b>${esc(st)}</b></div></div>`
+      : (creationTimerHtml || runDurationHtml || storePickup ? '<div class="meta">' + creationTimerHtml + ' ' + runDurationHtml + storePickup + '</div>' : '');
+    return `<article data-order-id="${esc(o.id)}" class="order order-compact ${queueClass}">
+      <div class="order-top"><div><span class="tag ${courierOffer && o.status === 'open' ? 'green' : tag}">${courierOffer && o.status === 'open' ? 'Disponível' : st}</span><div class="id">${esc(o.orderCode || o.id)} · ${date(o.created)}</div><h3>${esc(courierOffer || courierRunning ? o.storeName || 'Loja solicitante' : serviceTypeLabel(o.serviceType).split(' (')[0])}</h3></div>
+      <div class="order-value"><small>${courierRunning ? 'Valor da corrida' : 'Valor'}</small><div class="fee">${o.status === "cotacao" ? "A definir" : cash(o.fee)}</div></div></div>
+      ${itinerary}${locationControl}${queueBadge}${timing}
+      ${tags || courierOffer ? '<div class="order-flags">' + serviceBadge + tags + '</div>' : ''}
+      ${courierOffer ? '' : careDetails(o)}${returnControls(o)}${trackingShareHtml}${bidsHtml}${gpsTrackingInfo}${contacts}
+      ${details}${o.status === 'done' ? paymentDetails(o) : ''}${recordActions(o)}
+      <div class="footer"><div class="buttons">${action}</div></div></article>`;
+
   }
 
   function render(){
@@ -2033,6 +2104,7 @@
       return;
     }
     const adminTeamOpen=document.getElementById('admin-team')?.open===true;
+    const expandedOrders = new Set(Array.from(document.querySelectorAll('#content [data-order-details][open]'), node => node.dataset.orderDetails));
     const activity = document.getElementById('recent-activity');
     const activityState = activity ? {
       search: activity.querySelector('#activity-search').value,
@@ -2053,7 +2125,9 @@
     document.getElementById("role").innerHTML = [["store","Lojista"],["courier","Motoboy"],["admin","Administrador"]].map(x => '<option value="'+x[0]+'" '+(role===x[0]?"selected":"")+'>'+x[1]+'</option>').join("");
     document.getElementById("actor").innerHTML = people.map(p => '<option value="'+esc(p.id)+'" '+(p.id===actor?"selected":"")+'>'+esc(p.name)+'</option>').join("");
     document.getElementById("actor").disabled = role === "admin" || !people.length;
-    document.getElementById("avatar").dataset.nav = role === "store" ? "profile" : "dashboard";
+    const accountLink = document.getElementById("account-profile-link");
+    accountLink.dataset.nav = role === "admin" ? "dashboard" : "profile";
+    accountLink.textContent = role === "admin" ? "Painel administrativo" : role === "courier" ? "Meu Pix" : "Minha conta";
     document.getElementById("avatar").textContent = initials(role === "admin" ? "Admin" : (person()||{}).name);
     document.getElementById("crumb").textContent = label + " / " + title() + " · " + APP_VERSION; document.getElementById("page-title").textContent = title();
     const presence = role === "courier" ? (data.presence || []).find(p => p.id === currentUser?.uid) || {} : {};
@@ -2078,6 +2152,7 @@
     const tutorialButton='<button type="button" data-action="open-tutorial"><span>?</span><b>Tutorial do perfil</b><small>Rever os primeiros passos</small></button>';
     const quickActions = role !== 'admin' ? '<details class="quick-controls browser-preferences" data-browser-preferences><summary>⚙ Preferências e informações</summary><div class="quick-grid">'+tutorialButton+'<button type="button" data-nav="tariffs"><span>R$</span><b>Tarifas e avisos</b><small>Valores em vigor</small></button><button type="button" data-action="push-settings"><span>♬</span><b>Notificações e som</b><small>Ativar e testar</small></button>'+(role==='courier'?'<button type="button" data-nav="profile"><span>◇</span><b>Meu Pix</b><small>Dados para recebimento</small></button><button type="button" data-action="signal-rain"><span>☂</span><b>Sinalizar chuva</b><small>Avisar o administrador</small></button>':'')+'</div></details>' : '<details class="quick-controls browser-preferences"><summary>Ajuda e informações</summary><div class="quick-grid">'+tutorialButton+'</div></details>';
     document.getElementById("content").innerHTML = availabilityPanel + tariffBanner + tutorialContent() + paymentNotice + overdueNotice + show() + quickActions;
+    for (const detail of document.querySelectorAll('#content [data-order-details]')) detail.open = expandedOrders.has(detail.dataset.orderDetails);
     const updatedActivity = document.getElementById('recent-activity');
     if (updatedActivity && activityState) {
       updatedActivity.querySelector('#activity-search').value = activityState.search;
@@ -2224,6 +2299,10 @@
         <label><b>Endereço Completo da Loja (Rua, Número, Bairro)</b></label>
         <input type="text" id="prof-address" value="${esc(s.address || "")}" required placeholder="Ex: Av. Central, 450 - Centro">
       </div>
+      <div class="field full" style="margin-bottom:15px">
+        <label for="prof-neighborhood">Bairro da loja</label>
+        <input id="prof-neighborhood" maxlength="100" value="${esc(s.neighborhood || "")}">
+      </div>
       <button type="submit" class="btn primary full">Salvar Alterações do Perfil →</button>
     </form>`+externalAutoCallView(s);
   }
@@ -2364,7 +2443,8 @@
       let phone = document.getElementById("prof-phone").value.trim();
       let address = document.getElementById("prof-address").value.trim();
       try {
-        await command("saveProfile", null, { name, phone, address });
+        const neighborhood = document.getElementById("prof-neighborhood").value.trim();
+        await command("saveProfile", null, { name, phone, address, neighborhood });
         storeProfileDrafts.delete(currentUser.uid);
         toast("Perfil atualizado com sucesso!");
         view = "dashboard"; render();
@@ -2512,10 +2592,17 @@
       const st=person();
       if(!st||!st.address)storeProfileWarning='<div class="info">⚠️ <b>Atenção:</b> Cadastre o endereço da loja em <a href="#" data-nav="profile">Perfil</a>.</div>';
     }
-    const stats=stat("Em execução",run.length,"Corridas ativas","◷")+stat("Em aberto",op.length,"Aguardando motoboy","＋")+stat("Aguardando cotação",quotes.length,"Propostas pendentes","💬")+stat("Não acertados",unpaid.length,cash(unpaid.reduce((n,o)=>n+Number(o.fee||0),0)),"R$");
+    const stats = [
+      ["run", "Em execução", run.length, "Corridas ativas"],
+      ["open", "Em aberto", op.length, "Aguardando motoboy"],
+      ["quotes", "Cotações", quotes.length, "Aguardando propostas"],
+      ["reports", "Não acertados", unpaid.length, cash(unpaid.reduce((sum, order) => sum + Number(order.fee || 0), 0))]
+    ].map(([destination, label, count, detail]) => `<button type="button" class="stat overview-stat" data-nav="${destination}">
+      <span class="stat-top">${label}</span><span class="stat-value">${count}</span><span class="stat-sub">${detail}</span></button>`).join("");
+    const storeName = person()?.name || "Express Entregas";
     const section=(title,list,emptyTitle,emptyText)=>!list.length?'':'<section class="panel dashboard-section"><div class="panel-head"><h2>'+title+'</h2><span class="section-count">'+list.length+'</span></div>'+(list.length?'<div class="list">'+list.map(card).join("")+'</div>':empty(emptyTitle,emptyText))+'</section>';
     const actions=role==="store"?'<div class="dashboard-actions"><button type="button" class="btn primary" data-open-sheet data-sheet-mode="delivery">＋ Pedir motoboy</button><button type="button" class="btn secondary" data-open-sheet data-sheet-mode="quote">💬 Pedir cotação</button></div>':"";
-    return storeProfileWarning+'<div class="head store-overview"><div><h1>Olá, '+esc((person()||{name:"Admin"}).name.split(" ")[0])+'</h1><p>Prioridade para o que precisa de atenção agora.</p></div>'+actions+'</div><div class="grid stats">'+stats+'</div>'+(role==="store"?section("Em execução",run.sort((a,b)=>Number(b.accepted||0)-Number(a.accepted||0)),"Nenhuma corrida em execução","As corridas aceitas aparecerão aqui.")+section("Em aberto",op.sort((a,b)=>Number(a.created||0)-Number(b.created||0)),"Nenhum pedido em aberto","Os pedidos aguardando motoboy aparecerão aqui.")+section("Aguardando devolução",os.filter(o=>["awaiting_return","awaiting_quote_return"].includes(o.status)),"Nenhuma devolução pendente","As devoluções aguardando liberação aparecerão aqui.")+section("Aguardando cotação",quotes.sort((a,b)=>Number(b.created||0)-Number(a.created||0)),"Nenhuma cotação pendente","As propostas especiais aparecerão aqui."):"")+recentActivity(os);
+    return storeProfileWarning+'<div class="head store-overview"><div><p>Bem-vindo de volta</p><h1 class="'+(storeName.length > 20 ? "long-store-name" : "")+'">'+esc(storeName)+'</h1></div>'+actions+'</div><div class="grid stats">'+stats+'</div>'+(role==="store"?section("Em execução",run.sort((a,b)=>Number(b.accepted||0)-Number(a.accepted||0)),"Nenhuma corrida em execução","As corridas aceitas aparecerão aqui.")+section("Em aberto",op.sort((a,b)=>Number(a.created||0)-Number(b.created||0)),"Nenhum pedido em aberto","Os pedidos aguardando motoboy aparecerão aqui.")+section("Aguardando devolução",os.filter(o=>["awaiting_return","awaiting_quote_return"].includes(o.status)),"Nenhuma devolução pendente","As devoluções aguardando liberação aparecerão aqui.")+section("Aguardando cotação",quotes.sort((a,b)=>Number(b.created||0)-Number(a.created||0)),"Nenhuma cotação pendente","As propostas especiais aparecerão aqui."):"")+recentActivity(os);
   }
 
   // Atualiza a idade e a prioridade da fila mesmo sem novas alterações no Firebase.
@@ -2642,6 +2729,97 @@
     document.body.appendChild(dialog);dialog.showModal();
     dialog.querySelector('[data-record-cancel]').addEventListener('click',()=>dialog.close());
     return {dialog,form:dialog.querySelector('form'),feedback:dialog.querySelector('[data-record-feedback]')};
+  }
+  const callOrderContact = httpsCallable(functions, "orderContact");
+  const callRouteEstimate = httpsCallable(functions, "orderRouteEstimate");
+  function stopPickupRoute() {
+    if (pickupRoute?.timer) clearInterval(pickupRoute.timer);
+    pickupRoute = null;
+  }
+  async function refreshPickupRoute(route) {
+    if (pickupRoute !== route || document.hidden) return;
+    const order = data.orders.find(item => item.id === route.orderId);
+    if (view !== "available" || !isOffer(order) || order.revision !== route.revision || currentUser?.uid !== route.uid) {
+      stopPickupRoute();
+      render();
+      return;
+    }
+    if (route.loading) return;
+    route.loading = true;
+    render();
+    try {
+      if (!navigator.geolocation) throw Error("A localização está indisponível neste aparelho.");
+      const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve,
+        () => reject(Error("Permita a localização para calcular o trajeto.")), { timeout: 8000, maximumAge: 30000 }));
+      if (pickupRoute !== route || document.hidden || currentUser?.uid !== route.uid) return;
+      const { latitude, longitude } = position.coords;
+      const response = await callRouteEstimate({ orderId: order.id, latitude, longitude });
+      if (pickupRoute !== route) return;
+      if (!response.data.estimate) throw Error("Não foi possível localizar o primeiro ponto.");
+      route.estimate = response.data.estimate;
+    } catch (error) {
+      if (pickupRoute !== route) return;
+      route.error = error.message || "Trajeto indisponível.";
+      delete route.estimate;
+      clearInterval(route.timer);
+      route.timer = null;
+    } finally {
+      route.loading = false;
+      if (pickupRoute === route) render();
+    }
+  }
+  function togglePickupRoute(order) {
+    const wasActive = pickupRoute?.orderId === order.id && pickupRoute.timer;
+    stopPickupRoute();
+    if (wasActive) { render(); return; }
+    const route = { uid: currentUser.uid, orderId: order.id, revision: order.revision };
+    pickupRoute = route;
+    route.timer = setInterval(() => refreshPickupRoute(route), 65000);
+    void refreshPickupRoute(route);
+  }
+  async function openOrderContact(order, target, trigger) {
+    const session = currentUser?.uid;
+    const { phone } = (await callOrderContact({ orderId: order.id, target })).data;
+    if (!session || currentUser?.uid !== session) return;
+    if (!phone) {
+      trigger.disabled = true;
+      trigger.textContent = "Número indisponível";
+      return;
+    }
+    const label = { store: "Loja", courier: "Motoboy", customer: "Cliente" }[target];
+    const stages = [
+      ["Aceite", "Gostaria de confirmar a corrida aceita."],
+      ["Ida à coleta", "Estou a caminho do local de retirada."],
+      ["Retirada", "A retirada foi realizada."],
+      ["Ida ao destino", "Estou a caminho do destino."],
+      ["Chegada", "Cheguei ao destino."],
+      ["Conclusão", "A entrega foi concluída."],
+      ["Atraso", "Houve um atraso. Avisarei quando tiver uma nova previsão."],
+    ];
+    const { dialog, form } = recordDialog("WhatsApp · " + label,
+      '<label>Etapa<select name="stage">' + stages.map(([name], i) => '<option value="' + i + '">' + name + '</option>').join('') +
+      '</select></label><label>Mensagem<textarea name="message" rows="4" maxlength="700" required></textarea></label>',
+      "Abrir WhatsApp");
+    const update = () => {
+      const [name, text] = stages[Number(form.elements.stage.value)];
+      const code = order.orderCode || order.id;
+      form.elements.message.value = role === "store"
+        ? "Olá! Podemos falar sobre " + name.toLowerCase() + " do pedido " + code + "?"
+        : "Olá! Aqui é o motoboy do pedido " + code + ". " + text;
+    };
+    form.elements.stage.value = order.picked ? "3" : role === "courier" ? "1" : "0";
+    form.elements.stage.addEventListener("change", update);
+    update();
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      if (currentUser?.uid !== session || !data.orders.some(item => item.id === order.id && item.status === "run")) {
+        dialog.close();
+        return;
+      }
+      window.open("https://wa.me/" + phone + "?text=" + encodeURIComponent(form.elements.message.value.trim()), "_blank", "noopener,noreferrer");
+      dialog.close();
+    });
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
   }
   function captureDeliveryProof(){
     return new Promise(resolve=>{
@@ -2773,6 +2951,14 @@
         toast('Atualização confirmada.');render();return;
       }
       if(action==='print-order'){if(role!=='store'||order?.storeId!==actor)throw Error('Pedido de outra loja.');await printOrder(order);return;}
+      if(action==="order-contact"){
+        if (order?.status === "run") await openOrderContact(order, trigger.dataset.contact, trigger);
+        return;
+      }
+      if(action==="pickup-route"){
+        if (role === "courier" && currentUser && firebaseConfig.routeEstimatesEnabled === true && isOffer(order)) togglePickupRoute(order);
+        return;
+      }
       if(['open-password-recovery','open-first-password','reset-password','recovery-back','back-to-profiles'].includes(action)){
         if(busy||recoveryBusy)return;
         if(action==='open-first-password')openPasswordRecovery(true);

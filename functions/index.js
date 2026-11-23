@@ -8,6 +8,8 @@ const { defineSecret, defineString } = require("firebase-functions/params");
 const { createCommandHandler } = require("./commands");
 const { createDispatcher, createUpdateDispatcher, createOfferRoundProcessor } = require("./notifications");
 const { DomainError } = require("./domain");
+const { createOrderContact } = require("./order-contact");
+const { createRouteEstimate } = require("./order-route-estimate");
 const {releaseDueReturns}=require('./return-scheduler');
 const { activateTariffs } = require("./tariff-scheduler");
 const webPush = require("web-push");
@@ -37,6 +39,22 @@ exports.orderCommand = onCall(async request => {
     if (error instanceof DomainError) throw new HttpsError(error.code, error.message);
     console.error("Falha na operação V2", error.code || error.name);
     throw new HttpsError("internal", "Não foi possível concluir. Tente novamente com a mesma operação.");
+  }
+});
+const orderContact = createOrderContact(db);
+exports.orderContact = onCall(async request => {
+  try { return await orderContact(request); }
+  catch (error) {
+    if (error instanceof DomainError) throw new HttpsError(error.code, error.message);
+    throw new HttpsError("internal", "Não foi possível consultar o contato.");
+  }
+});
+const routeEstimate = createRouteEstimate(db, () => process.env.EXPRESS_ROUTES_API_KEY);
+exports.orderRouteEstimate = onCall(async request => {
+  try { return { estimate: await routeEstimate(request.auth, request.data) }; }
+  catch (error) {
+    if (error instanceof DomainError) throw new HttpsError(error.code, error.message);
+    throw new HttpsError("unavailable", "Não foi possível calcular o trajeto.");
   }
 });
 exports.onPushJobCreated = onValueCreated({ ref: "/pushJobs/{jobId}", region: "us-central1", secrets: pushSecrets }, async event => { const t = transports(); return createDispatcher(db, t.messaging, Date.now, t.web)(event.params.jobId); });

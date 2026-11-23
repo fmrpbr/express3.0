@@ -40,3 +40,20 @@ O site e o repositório são públicos. Não inclua credenciais privadas, dados 
 ## Limite da candidata
 
 Esta cópia contém o site e backend V3.0, não contém APK, projeto Android ou credenciais. Integrações de iFood, Aiboo e pede.ai permanecem sem adapters validados. Consulte `docs/homologacao/STATUS-CANDIDATO-V3.0-RC1-2026-11-22.md` para os testes e pendências externas.
+
+## Trajeto de moto na homologação
+
+A estimativa fica desativada por padrão. Para testar, disponibilize a Google
+Routes API no projeto separado de homologação, com limites de uso, e associe
+uma chave restrita a essa API como segredo de execução `EXPRESS_ROUTES_API_KEY`
+da função `orderRouteEstimate`. Habilite `routeEstimatesEnabled` na
+configuração pública apenas desse ambiente. Nunca inclua a chave do servidor
+na configuração web.
+
+O botão de rota pede a localização ao motoboy e envia ao Google Maps somente
+as coordenadas e o endereço do primeiro ponto de uma oferta acessível ao
+usuário. Enquanto o card estiver na lista e a atualização estiver ligada,
+ocorre uma nova consulta em intervalos de aproximadamente um minuto. O
+endereço de retirada permanece no backend e a interface exibe distância e
+tempo apenas quando o provedor retorna a estimativa. Revise o aviso de
+privacidade e as condições do provedor antes de habilitar em ambiente real.

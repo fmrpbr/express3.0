@@ -139,3 +139,99 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 [data-appearance="dark"] .auth-tab.active { color: var(--red-dark); }
 [data-appearance="dark"] .order-care { background: var(--orangebg); color: var(--orange); }
 [data-appearance="dark"] .v3-tutorial { background: var(--surface); }
+
+.login-heading {
+  border-top: 1px solid var(--line);
+  margin: 18px 0 22px;
+  padding-top: 24px;
+  text-align: center;
+}
+.login-heading h2 { font-size: clamp(22px, 6vw, 30px); margin: 0; line-height: 1.15; }
+.login-heading p { margin: 8px 0 0; color: var(--muted); }
+.login-form .field input { min-height: 48px; border-radius: 24px; }
+.login-form .btn.primary { min-height: 50px; }
+.login-link { background: transparent; color: var(--red-dark); border: 0; font-weight: 750; padding: 6px 0; }
+.password-link { justify-self: end; margin-top: -8px; min-height: 36px; }
+.login-account { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; color: var(--muted); }
+.login-links { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--line); padding: 15px 0; color: var(--muted); font-size: 12px; }
+.login-links a { color: inherit; }
+.login-links summary { cursor: pointer; }
+.login-links details[open] { flex-basis: 100%; }
+.login-links details button { display: block; min-height: 36px; }
+.hero-stat small { font-size: clamp(7px, 2.1vw, 10px); white-space: nowrap; }
+.store-overview h1 { overflow-wrap: anywhere; }
+.store-overview h1.long-store-name { font-size: clamp(20px, 4vw, 26px); }
+.order-compact .order-top .id { margin-top: 6px; }
+.order-compact .order-top h3 { overflow-wrap: anywhere; }
+.order-compact .order-value { flex: 0 0 auto; text-align: right; }
+.order-compact .order-value small { color: var(--muted); }
+.order-compact .order-value .fee { margin-top: 0; }
+.order-route {
+  display: grid;
+  margin: 10px 0;
+  padding: 13px;
+  gap: 12px;
+  color: #f6fbff;
+  background: #102d40;
+  border-radius: 12px;
+}
+.order-route.with-metric { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.order-route .order-itinerary { margin: 0; gap: 10px; }
+.order-point { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.order-point small, .order-route .order-estimates small { color: #b9cdda; }
+.order-route .order-point b { margin: 0; color: inherit; font-size: 15px; }
+.order-route .order-point span { font-size: 12px; }
+.order-route .order-estimates {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid #527084;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.order-route .order-estimates b { font-size: 13px; }
+.order-flags { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0; }
+.order-details { margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
+.order-details summary { cursor: pointer; font-weight: 700; min-height: 32px; align-content: center; }
+.order-details .order-store { margin-top: 7px; }
+.running-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+.running-summary > div { background: var(--surface-alt); border-radius: 9px; padding: 8px 10px; }
+.running-summary :is(small, b) { display: block; }
+.running-summary small { color: var(--muted); }
+.running-summary b { overflow-wrap: anywhere; }
+.sheet-body { gap: 10px; }
+.sheet-body .formgrid { gap: 8px; }
+.sheet-body .field :is(input, select, textarea) { padding: 9px 11px; }
+.sheet-footer .btn { min-height: 44px; }
+.overview-stat { display: grid; text-align: start; color: var(--ink); }
+.overview-stat:hover { border-color: var(--primary); }
+.login-settings [data-app-version] { margin-inline-start: auto; }
+.selectors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px; }
+.account-menu { position: relative; }
+.account-menu summary { cursor: pointer; list-style: none; }
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-options { text-align: start; }
+.account-options {
+  position: absolute;
+  inset: calc(100% + 8px) 0 auto auto;
+  z-index: 4;
+  display: grid;
+  gap: 6px;
+  min-width: 146px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.order-contacts { margin: 8px 0; }
+#service-date-options summary { cursor: pointer; font-weight: 700; padding: 8px 0; }
+@media (min-width: 900px) {
+  .selectors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px auto; }
+  .top-appearance { grid-column: 5; }
+}

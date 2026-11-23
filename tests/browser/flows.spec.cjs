@@ -9,8 +9,9 @@ test.beforeAll(async()=>{
 test.afterAll(async()=>{await app.delete();});
 async function register(page,role,email){
   await page.goto(base);
-  if(role==='courier') await page.locator('#btn-login-courier').click();
+  await expect(page.locator('#login-role-tabs')).toBeHidden();
   await page.locator('#tab-register').click();
+  if(role==='courier') await page.locator('#btn-login-courier').click();
   await page.locator('#auth-name').fill(role==='courier'?'Motoboy Teste':'Loja Teste');
   await page.locator('#auth-extra').fill('27999999999');
   await page.locator('#auth-email').fill(email);
@@ -22,13 +23,18 @@ async function register(page,role,email){
   await db.ref('profiles/'+(role==='store'?'stores/':'couriers/')+user.uid+'/accessStatus').set('approved');
   await expect(page.getByRole('heading',{name:'Cadastro aguardando aprovação'})).toHaveCount(0);
 }
+async function openAdmin(page) {
+  const help = page.locator('#login-help');
+  if (!(await help.evaluate(node => node.open))) await help.locator('summary').click();
+  await page.locator('#admin-entry-button').click();
+}
 let clientSerial=10000000;
 test('administrador ajusta as rodadas de oferta pela tela de homologação',async({browser})=>{
   const email='admin-offers-'+Date.now()+'@example.test',password='test-password-123';
   const account=await app.auth().createUser({email,password});
   await app.auth().setCustomUserClaims(account.uid,{admin:true});
   const page=await browser.newPage();
-  await page.goto(base);await page.locator('#admin-entry-button').click();
+  await page.goto(base);await openAdmin(page);
   await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
   await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
   await page.locator('#nav [data-nav=offers]').click();
@@ -47,7 +53,7 @@ test('admin cadastra e pausa cidade sem alterar as tarifas legadas',async({brows
   await app.auth().setCustomUserClaims(account.uid,{admin:true});
   const page=await browser.newPage();
   try{
-    await page.goto(base);await page.locator('#admin-entry-button').click();
+    await page.goto(base);await openAdmin(page);
     await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
     await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
     await page.locator('#nav [data-nav=cities]').click();
@@ -402,7 +408,7 @@ test('admin agenda tabela, perfis recebem aviso, preços antigos permanecem e ch
   await store.locator('#store-profile-form button[type=submit]').click();
   await expect(store.locator('#prof-address')).toHaveCount(0);
   await register(courier,'courier','tariff-courier-'+Date.now()+'@example.test');
-  await ad.goto(base);await ad.locator('#auth-email').fill(email);await ad.locator('#auth-password').fill('test-password-123');await ad.locator('[data-admin-login]').click();
+  await ad.goto(base);await ad.locator('#auth-email').fill(email);await ad.locator('#auth-password').fill('test-password-123');await openAdmin(ad);
   await expect(ad.locator('#login-screen')).toBeHidden();
   await ad.evaluate(()=>window.__express.setView('rates'));
   await expect(ad.locator('#tariff-form [data-rate=sedeDay]')).toHaveValue('5');
@@ -449,7 +455,7 @@ test('painel admin filtra, pagina, acompanha pagamentos e preserva detalhes sem 
   await db.ref().set({orders,profiles:{stores:{shopA:{name:'LOJA A'},shopB:{name:'LOJA B'}},couriers:{riderA:{name:'MOTO A'},riderB:{name:'MOTO B'},riderC:{name:'MOTO C'},riderD:{name:'MOTO D'}}},courierPresence:{riderA:{availableForWork:true},riderB:{availableForWork:true},riderC:{availableForWork:false},riderD:{availableForWork:false}},courierConnections:{riderA:{s:{lastSeen:now}},riderB:{s:{lastSeen:now-100000}},riderD:{s:{lastSeen:now}}}});
   const context=await browser.newContext({viewport:{width:393,height:852}}),page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base);await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill('test-password-123');await page.locator('[data-admin-login]').click();
+  await page.goto(base);await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill('test-password-123');await openAdmin(page);
   await expect(page.locator('[data-admin-stat=orders-total] .stat-value')).toHaveText('27');
   await expect(page.locator('[data-admin-stat=orders-open] .stat-value')).toHaveText('21');
   await expect(page.locator('[data-admin-stat=finance-reported] .stat-value')).toContainText('7,00');
@@ -500,7 +506,7 @@ async function completePasswordReset(email,password,apiKey){
 test('admin sem senha abre primeiro acesso, solicita link e entra após definir senha pelo provedor',async({page})=>{
   const email='first-admin-'+Date.now()+'@example.test',password='nova-senha-admin-123';
   const user=await app.auth().createUser({email});await app.auth().setCustomUserClaims(user.uid,{admin:true});
-  await page.goto(base);await page.locator('[data-admin-login]').click();
+  await page.goto(base);await openAdmin(page);
   await expect(page.locator('#admin-login-panel')).toBeVisible();
   await expect(page.locator('#auth-feedback')).toContainText('primeira senha');
   await expect(page.locator('#tab-register')).toBeHidden();
@@ -536,9 +542,9 @@ test('recuperação troca a senha existente e não concede admin a uma loja',asy
   const old=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:oldPassword,returnSecureToken:true})});
   expect(old.status).toBe(400);
   await page.locator('[data-action=recovery-back]').click();await page.locator('#auth-password').fill(newPassword);
-  await expect(page.locator('#tab-login')).toHaveClass(/active/);
+  await expect(page.locator('#login-role-tabs')).toBeHidden();
   await expect(page.locator('#field-extra')).toBeHidden();
-  await page.locator('[data-admin-login]').click();
+  await openAdmin(page);
   await expect(page.locator('#auth-feedback')).toContainText('não possui permissão de administrador');
   expect((await app.auth().getUser(user.uid)).customClaims?.admin).not.toBe(true);
   await page.locator('[data-action=back-to-profiles]').click();
@@ -551,7 +557,7 @@ test('recuperação mostra erro de rede na própria tela e permanece acessível 
   await page.route('**/accounts:sendOobCode**',route=>route.abort());
   for(const width of [320,393,480]){
     await page.setViewportSize({width,height:568});await page.goto(base);
-    await page.locator('[data-admin-login]').click();
+    await openAdmin(page);
     await page.locator('[data-action=open-password-recovery]').click();
     await page.locator('#recovery-email').fill('network-test@example.test');
     await page.locator('#recovery-submit').click();
@@ -617,7 +623,7 @@ test('aprovação e bloqueio em tempo real, cuidados no aceite, cancelamento de 
   const adminUser=await app.auth().createUser({email:'approval-admin-'+suffix+'@example.test',password:'test-password-123'});
   await app.auth().setCustomUserClaims(adminUser.uid,{admin:true});
   await adminPage.goto(base);
-  await adminPage.locator('#auth-email').fill(adminUser.email);await adminPage.locator('#auth-password').fill('test-password-123');await adminPage.locator('[data-admin-login]').click();
+  await adminPage.locator('#auth-email').fill(adminUser.email);await adminPage.locator('#auth-password').fill('test-password-123');await openAdmin(adminPage);
   await expect(adminPage.locator('#login-screen')).toBeHidden();
   // Register without bypassing the actual approval UI.
   await store.goto(base);await store.locator('#tab-register').click();await store.locator('#auth-name').fill('LOJA APROVAÇÃO');await store.locator('#auth-extra').fill('27999999999');await store.locator('#auth-email').fill('approval-shop-'+suffix+'@example.test');await store.locator('#auth-password').fill('test-password-123');await store.locator('#auth-submit-btn').click();
