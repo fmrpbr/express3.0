@@ -35,11 +35,26 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 }
 body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .app { background: var(--surface); }
-.login-screen { background: #081e2b; }
-.login-layout { width: min(100%, 960px); margin: auto; }
-.login-intro { display: none; }
-.login-card { background: var(--surface); width: 100%; }
-.login-settings { display: flex; align-items: end; justify-content: space-between; gap: 12px; color: var(--muted); }
+.login-screen { background: var(--paper); align-items: flex-start; padding: 20px clamp(12px, 4.4vw, 24px); }
+.login-layout {
+  width: min(100%, 440px);
+  margin: auto;
+  padding: clamp(10px, 3.3vw, 16px);
+  border-radius: 27px;
+  background: #081e2b;
+}
+.login-card {
+  width: 100%;
+  padding: 21px clamp(15px, 4.4vw, 24px) 19px;
+  border-radius: 19px;
+  background: var(--surface);
+  box-shadow: none;
+}
+.login-brand { margin-bottom: 22px; gap: 12px; }
+.login-brand .logo { width: 50px; height: 50px; }
+.login-brand h1 { font-size: clamp(20px, 6.1vw, 28px); line-height: 1.12; }
+.login-brand small { display: block; margin-top: 4px; line-height: 1.35; }
+.login-version { display: block; text-align: center; color: var(--muted); font-size: 12px; }
 .appearance-control { display: grid; gap: 3px; font-size: 11px; font-weight: 700; }
 .appearance-control select {
   min-height: 34px;
@@ -77,11 +92,6 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .order-estimates > div + div { border-inline-start: 1px solid currentColor; }
 
 @media (min-width: 900px) {
-  .login-layout { display: grid; grid-template-columns: 1fr minmax(0, 460px); align-items: center; gap: 64px; }
-  .login-intro { display: block; color: #f5f9fc; }
-  .login-intro img { border-radius: 22px; }
-  .login-intro p { color: #a6c0d1; margin: 22px 0 8px; font-weight: 650; }
-  .login-intro h2 { margin: 0; max-width: 13ch; font-size: clamp(40px, 6vw, 66px); font-weight: 800; line-height: 1.04; letter-spacing: -.055em; }
   .side { width: 224px; overflow-y: auto; }
   .content { width: calc(100% - 42px); }
   .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -142,14 +152,18 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 
 .login-heading {
   border-top: 1px solid var(--line);
-  margin: 18px 0 22px;
-  padding-top: 24px;
+  margin: 0 0 17px;
+  padding-top: 21px;
   text-align: center;
 }
 .login-heading h2 { font-size: clamp(22px, 6vw, 30px); margin: 0; line-height: 1.15; }
 .login-heading p { margin: 8px 0 0; color: var(--muted); }
-.login-form .field input { min-height: 48px; border-radius: 24px; }
-.login-form .btn.primary { min-height: 50px; }
+.login-form .field input { min-height: 46px; border-radius: 24px; background: var(--surface); }
+.login-form .btn.primary { min-height: 52px; font-size: 16px; }
+.login-form .field label { font-size: 14px; }
+.login-form .pwd-toggle { opacity: 0; }
+.login-form .pwd-box:focus-within .pwd-toggle,
+.login-form .pwd-box input:not(:placeholder-shown) + .pwd-toggle { opacity: 1; }
 .login-link { background: transparent; color: var(--red-dark); border: 0; font-weight: 750; padding: 6px 0; }
 .password-link { justify-self: end; margin-top: -8px; min-height: 36px; }
 .login-account { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; color: var(--muted); }
@@ -158,6 +172,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .login-links summary { cursor: pointer; }
 .login-links details[open] { flex-basis: 100%; }
 .login-links details button { display: block; min-height: 36px; }
+.login-links .appearance-control { margin-top: 8px; width: max-content; }
 .hero-stat small { font-size: clamp(7px, 2.1vw, 10px); white-space: nowrap; }
 .store-overview h1 { overflow-wrap: anywhere; }
 .store-overview h1.long-store-name { font-size: clamp(20px, 4vw, 26px); }
@@ -211,7 +226,6 @@ body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 .sheet-footer .btn { min-height: 44px; }
 .overview-stat { display: grid; text-align: start; color: var(--ink); }
 .overview-stat:hover { border-color: var(--primary); }
-.login-settings [data-app-version] { margin-inline-start: auto; }
 .selectors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px; }
 .account-menu { position: relative; }
 .account-menu summary { cursor: pointer; list-style: none; }

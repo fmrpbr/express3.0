@@ -267,8 +267,10 @@
   function selectLoginRoleLocal(r){
     window.__expressLoginRole = r;
     var s = document.getElementById("btn-login-store"), c = document.getElementById("btn-login-courier");
-    if(s) s.className = "role-btn " + (r === "store" ? "active" : "");
-    if(c) c.className = "role-btn " + (r === "courier" ? "active" : "");
+    s.classList.toggle("active", r === "store");
+    s.setAttribute("aria-pressed", String(r === "store"));
+    c.classList.toggle("active", r === "courier");
+    c.setAttribute("aria-pressed", String(r === "courier"));
     var ln = document.getElementById("label-name"), an = document.getElementById("auth-name");
     if(ln) ln.textContent = r === "store" ? "Nome do Estabelecimento" : "Nome Completo";
     if(an) an.placeholder = r === "store" ? "Ex: Restaurante Central" : "Ex: João Silva";
@@ -280,6 +282,9 @@
     document.getElementById("login-role-tabs").hidden = !registering;
     document.getElementById("login-heading").textContent = registering ? "Crie sua conta" : "Bem-vindo de volta!";
     document.getElementById("login-description").textContent = registering ? "Escolha seu perfil para começar." : "Acesse sua conta para continuar.";
+    var passwordInput = document.getElementById("auth-password");
+    passwordInput.autocomplete = registering ? "new-password" : "current-password";
+    if (passwordInput.type !== "password") togglePasswordLocal();
     var l = document.getElementById("tab-login"), rg = document.getElementById("tab-register");
     if(l) l.className = "auth-tab " + (mode === "login" ? "active" : "");
     if(rg) rg.className = "auth-tab " + (mode === "register" ? "active" : "");
@@ -288,14 +293,17 @@
     document.getElementById("login-account-prompt").textContent = registering ? "Já tem conta?" : "Ainda não tem conta?";
     var note = document.getElementById("registration-entry-note");
     if (note) note.hidden = !registering;
-    var fn = document.getElementById("field-name"), btn = document.getElementById("auth-submit-btn");
-    if(fn) fn.style.display = mode === "register" ? "grid" : "none";
-    if(btn) btn.textContent = mode === "register" ? "Criar conta →" : "Entrar na plataforma →";
+    for (var id of ["field-name", "field-extra"]) {
+      document.getElementById(id).style.display = registering ? "grid" : "none";
+    }
+    document.getElementById("auth-submit-btn").textContent = registering ? "Criar conta →" : "Entrar na plataforma →";
   }
 
   function togglePasswordLocal(){
     var input = document.getElementById("auth-password");
-    if(input) input.type = input.type === "password" ? "text" : "password";
+    var visible = input.type === "password";
+    input.type = visible ? "text" : "password";
+    document.querySelector("#auth-form [data-toggle-password]").setAttribute("aria-pressed", String(visible));
   }
 
   function openSheetLocal(editId, mode){
@@ -370,11 +378,6 @@
 <!-- Tela de Login -->
 <div id="login-screen" class="login-screen">
   <div class="login-layout">
-    <div class="login-intro">
-      <img src="./icons/icon-192.png" alt="" width="96" height="96">
-      <p>Express Entregas</p>
-      <h2>Entregas para sua loja, em Aracruz.</h2>
-    </div>
   <div class="login-card">
     <div class="login-brand">
       <div class="logo"><img src="./icons/icon-192.png" alt=""></div>
@@ -389,9 +392,9 @@
       <p id="login-description">Acesse sua conta para continuar.</p>
     </div>
 
-    <div class="role-tabs" id="login-role-tabs" hidden>
-      <button type="button" class="role-btn active" id="btn-login-store" data-login-role="store">🏪 Lojista</button>
-      <button type="button" class="role-btn" id="btn-login-courier" data-login-role="courier">🏍 Motoboy</button>
+    <div class="role-tabs" id="login-role-tabs" role="group" aria-label="Tipo de conta" hidden>
+      <button type="button" class="role-btn active" id="btn-login-store" data-login-role="store" aria-pressed="true">Lojista</button>
+      <button type="button" class="role-btn" id="btn-login-courier" data-login-role="courier" aria-pressed="false">Motoboy</button>
     </div>
 
     <section id="admin-login-panel" class="info" hidden>
@@ -401,7 +404,7 @@
     </section>
     <form id="auth-form" class="login-form">
       <div class="field full" id="field-name" style="display:none">
-        <label id="label-name">Nome do Estabelecimento</label>
+        <label id="label-name" for="auth-name">Nome do Estabelecimento</label>
         <input type="text" id="auth-name" placeholder="Ex: Restaurante Central">
       </div>
 
@@ -413,14 +416,14 @@
       <div class="field full">
         <label for="auth-password">Senha</label>
         <div class="pwd-box">
-          <input type="password" id="auth-password" required autocomplete="current-password" placeholder="••••••••">
-          <button type="button" class="pwd-toggle" data-toggle-password aria-label="Mostrar ou ocultar senha">👁</button>
+          <input type="password" id="auth-password" required autocomplete="current-password" placeholder="Digite sua senha">
+          <button type="button" class="pwd-toggle" data-toggle-password aria-label="Mostrar senha" aria-pressed="false">👁</button>
         </div>
       </div>
 
       <div class="field full" id="field-extra" style="display:none">
-        <label id="label-extra">Telefone / WhatsApp</label>
-        <input type="tel" id="auth-extra" placeholder="(27) 99999-9999">
+        <label id="label-extra" for="auth-extra">Telefone / WhatsApp</label>
+        <input type="tel" id="auth-extra" autocomplete="tel" placeholder="(27) 99999-9999">
       </div>
 
       <button type="button" class="login-link password-link" data-action="open-password-recovery">Esqueceu sua senha?</button>
@@ -451,18 +454,16 @@
       <details id="login-help"><summary>Ajuda</summary>
         <button type="button" class="login-link" data-action="open-first-password">Definir minha primeira senha</button>
         <button type="button" class="login-link" id="admin-entry-button" data-admin-login>Acesso administrativo</button>
+        <label class="appearance-control">Aparência
+          <select data-appearance-select>
+            <option value="auto">Automático</option>
+            <option value="light">Claro</option>
+            <option value="dark">Escuro</option>
+          </select>
+        </label>
       </details>
     </div>
-    <div class="login-settings">
-      <label class="appearance-control">Aparência
-        <select data-appearance-select>
-          <option value="auto">Automático</option>
-          <option value="light">Claro</option>
-          <option value="dark">Escuro</option>
-        </select>
-      </label>
-      <small data-app-version>Versão 3.0.0</small>
-    </div>
+    <small class="login-version">Express Entregas · <span data-app-version>Versão 3.0.0</span></small>
   </div>
   </div>
 </div>
@@ -475,7 +476,6 @@
   // Opens the existing registration UI. Account creation and approval stay on the server.
   window.__expressUI.selectLoginRole(profile);
   window.__expressUI.setAuthTab('register');
-  document.getElementById('field-extra').style.display = 'grid';
   var note = document.createElement('p');
   note.id = 'registration-entry-note';
   note.className = 'info';
@@ -1026,26 +1026,19 @@
   });
 
   window.selectLoginRole = function(r) {
-    currentLoginRole = r; window.__expressLoginRole = r;
+    currentLoginRole = r;
+    window.__expressUI.selectLoginRole(r);
     setAuthFeedback("", "info");
-    let s = document.getElementById("btn-login-store"), c = document.getElementById("btn-login-courier");
-    if(s) s.className = "role-btn " + (r === "store" ? "active" : "");
-    if(c) c.className = "role-btn " + (r === "courier" ? "active" : "");
-    let ln = document.getElementById("label-name"), an = document.getElementById("auth-name");
-    if(ln) ln.textContent = r === "store" ? "Nome do Estabelecimento" : "Nome Completo";
-    if(an) an.placeholder = r === "store" ? "Ex: Restaurante Central" : "Ex: João Silva";
   };
 
   window.setAuthTab = function(mode) {
     currentAuthMode = mode; window.__expressAuthMode = mode;
     window.__expressUI.setAuthTab(mode);
     setAuthFeedback("", "info");
-    document.getElementById("field-extra").style.display = mode === "register" ? "grid" : "none";
   };
 
   window.togglePassword = function() {
-    let input = document.getElementById("auth-password");
-    input.type = input.type === "password" ? "text" : "password";
+    window.__expressUI.togglePassword();
   };
 
   function showLoginLayout(){
