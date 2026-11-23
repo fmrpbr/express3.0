@@ -28,6 +28,11 @@ async function openAdmin(page) {
   if (!(await help.evaluate(node => node.open))) await help.locator('summary').click();
   await page.locator('#admin-entry-button').click();
 }
+async function openNav(page, destination) {
+  const button = page.locator('#nav [data-nav="' + destination + '"]');
+  if (!(await button.isVisible())) await page.locator('#nav .nav-more summary').click();
+  await button.click();
+}
 let clientSerial=10000000;
 test('administrador ajusta as rodadas de oferta pela tela de homologação',async({browser})=>{
   const email='admin-offers-'+Date.now()+'@example.test',password='test-password-123';
@@ -37,7 +42,7 @@ test('administrador ajusta as rodadas de oferta pela tela de homologação',asyn
   await page.goto(base);await openAdmin(page);
   await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
   await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
-  await page.locator('#nav [data-nav=offers]').click();
+  await openNav(page, 'offers');
   await expect(page.locator('#content h1')).toHaveText('Distribuição de ofertas');
   await page.locator('#offers-enabled').check();await page.locator('#offers-couriers').fill('2');
   await page.locator('#offers-seconds').fill('45');await page.locator('#offers-rounds').fill('2');
@@ -56,7 +61,7 @@ test('admin cadastra e pausa cidade sem alterar as tarifas legadas',async({brows
     await page.goto(base);await openAdmin(page);
     await page.locator('#auth-email').fill(email);await page.locator('#auth-password').fill(password);await page.locator('#auth-submit-btn').click();
     await expect(page.locator('#login-screen')).toBeHidden({timeout:15000});
-    await page.locator('#nav [data-nav=cities]').click();
+    await openNav(page, 'cities');
     await page.locator('#city-name').fill('Vila Velha');await page.locator('#city-base-fee').fill('18.50');await page.locator('#city-neighborhood-rates').fill('Centro = 21,50\nPraia da Costa = 25.00');
     expect(await page.locator('#city-config-form').evaluate(form=>form.checkValidity())).toBe(true);
     await page.locator('#city-config-form button[type=submit]').click();
@@ -68,7 +73,7 @@ test('admin cadastra e pausa cidade sem alterar as tarifas legadas',async({brows
     await expect(page.locator('#content')).toContainText('PAUSADA');
     expect((await db.ref('config/cities/vila-velha/enabled').get()).val()).toBe(false);
     expect((await db.ref('config/tariffPlans').get()).val()).toBeNull();
-    await page.locator('#nav [data-nav=integrations]').click();
+    await openNav(page, 'integrations');
     await expect(page.locator('#content')).toContainText('ADAPTER NÃO IMPLEMENTADO');
     await expect(page.locator('#content .registry-entry')).toHaveCount(3);
   }finally{
@@ -190,7 +195,10 @@ test('cadastro mobile, perfil, pedido, aceite, retirada, conclusão e pagamento 
   await expect(courier.locator('[data-work-status]')).toHaveText('OCUPADO');
   await expect(courier.locator('#hero-busy')).toHaveText('1');
   await expect(courier.locator('#hero-available')).toHaveText('0');
-  await store.locator('#nav [data-nav=run]').click();
+  await openNav(store, 'dashboard');
+  await expect(store.locator('#content .overview-stat[data-nav=run]')).toContainText('1');
+  await expect(store.locator('#content [data-order-id]')).toHaveCount(0);
+  await store.locator('#content .overview-stat[data-nav=run]').click();
   await expect(store.locator('#page-title')).toHaveText('Em execução');
   await expect(store.locator('[data-order-id]')).toHaveCount(1);
 

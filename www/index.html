@@ -342,6 +342,9 @@
 
     var nav = e.target.closest ? e.target.closest("[data-nav]") : null;
     if(nav){
+      if (nav.tagName === "A") e.preventDefault();
+      var menu = nav.closest(".nav-more, .account-menu");
+      if (menu) menu.open = false;
       if(!window.__expressModuleReady || !window.__express || !window.__express.setView){ showLoading(); return; }
       window.__express.setView(nav.dataset.nav); return;
     }
@@ -602,19 +605,37 @@
       <div class="logo"><img src="./icons/icon-192.png" alt=""></div>
       <div><b>Express Entregas</b><small>Lojista ↔ Motoboy</small></div>
     </div>
-    <div>
-      <div class="nav-title">NAVEGAÇÃO</div>
-      <nav id="nav" class="nav"></nav>
-    </div>
-    <div class="side-note">
-      <b>Operação Completa</b>
-      Rastreio, cotações e relatórios integrados.
-    </div>
+    <nav id="nav" class="nav" aria-label="Navegação principal"></nav>
   </aside>
 
   <div class="main">
-    <!-- Painel operacional compacto no espaço do antigo mapa -->
-    <section class="map-hero" aria-label="Painel operacional Express">
+    <header class="top">
+      <div class="top-heading">
+        <div id="crumb" class="crumb">Express Entregas</div>
+        <h2 id="page-title">Visão geral</h2>
+      </div>
+      <div class="selectors">
+        <button type="button" class="btn secondary tiny" data-enable-push aria-label="Ativar notificações" title="Ativar notificações">🔔</button>
+        <details class="account-menu">
+          <summary id="avatar" class="avatar" aria-label="Menu da conta">EE</summary>
+          <div class="account-options">
+            <label class="selectbox" hidden><small>Perfil</small><select id="role" disabled></select></label>
+            <label class="selectbox" id="actor-option" hidden><small id="actor-label">Estabelecimento</small><select id="actor"></select></label>
+            <button type="button" class="btn secondary tiny" id="account-profile-link" data-nav="profile">Minha conta</button>
+            <label class="appearance-control">Aparência
+              <select data-appearance-select>
+                <option value="auto">Automático</option>
+                <option value="light">Claro</option>
+                <option value="dark">Escuro</option>
+              </select>
+            </label>
+            <button type="button" class="btn danger tiny" data-logout>Sair</button>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <section class="map-hero" id="operations-summary" aria-label="Painel operacional Express">
       <div class="hero-dashboard">
         <div class="hero-top">
           <div class="hero-clock"><small id="hero-date">DATA ATUAL</small><b id="hero-time">--:--</b></div>
@@ -622,7 +643,6 @@
             <span class="hero-weather-icon" id="hero-weather-icon">⛅</span>
             <div class="hero-weather-copy"><b id="hero-weather-temp">--°</b><small id="hero-weather-desc">CLIMA ARACRUZ</small></div>
           </div>
-          <div class="hero-total"><b id="hero-total">0</b><small>MOTOBOYS</small></div>
         </div>
         <div class="hero-stats" aria-label="Situação dos motoboys">
           <div class="hero-stat online"><b id="hero-online">0</b><small>ONLINE</small></div>
@@ -630,38 +650,12 @@
           <div class="hero-stat busy"><b id="hero-busy">0</b><small>OCUPADOS</small></div>
           <div class="hero-stat offline"><b id="hero-offline">0</b><small>OFFLINE</small></div>
         </div>
-        <div class="hero-alerts" aria-label="Avisos recentes">
+        <div class="hero-alerts" aria-label="Avisos recentes" hidden>
           <span class="hero-alert-tag">ALERTAS</span>
           <div class="hero-alert-window" aria-live="polite"><div class="hero-alert-track" id="hero-alert-track"><span>SEM AVISOS NO MOMENTO</span></div></div>
         </div>
       </div>
     </section>
-
-    <header class="top">
-      <div>
-        <div id="crumb" class="crumb">EXPRESS LOGÍSTICA</div>
-        <h2 id="page-title">Painel de Controle</h2>
-      </div>
-      <div class="selectors">
-        <label class="appearance-control top-appearance">Aparência
-          <select data-appearance-select>
-            <option value="auto">Automático</option>
-            <option value="light">Claro</option>
-            <option value="dark">Escuro</option>
-          </select>
-        </label>
-        <label class="selectbox"><small>PERFIL</small><select id="role" disabled></select></label>
-        <label class="selectbox"><small id="actor-label">USUÁRIO</small><select id="actor"></select></label>
-        <details class="account-menu">
-          <summary id="avatar" class="avatar" aria-label="Menu da conta">EE</summary>
-          <div class="account-options">
-            <button type="button" class="btn secondary tiny" id="account-profile-link" data-nav="profile">Minha conta</button>
-            <button type="button" class="btn danger tiny" data-logout>Sair</button>
-          </div>
-        </details>
-        <button type="button" class="btn secondary tiny" data-enable-push title="Ativar notificações">🔔</button>
-      </div>
-    </header>
 
     <main id="content" class="content"></main>
   </div>
@@ -1414,7 +1408,7 @@
     const available = onlineList.filter(p => p.availableForWork === true && p.busy !== true && Number(p.occupiedSlots || p.activeCount || 0) === 0).length;
     const offline = Math.max(0, total - online);
     const values = {
-      "hero-total":total, "hero-online":online, "hero-available":available,
+      "hero-online":online, "hero-available":available,
       "hero-busy":occupied, "hero-offline":offline
     };
     Object.entries(values).forEach(([id,value]) => {
@@ -1433,7 +1427,8 @@
       const notices=window.ExpressBrowserNotices.select(systemNotices,serverNow());
       const tickerNotices=view==='dashboard'?notices.ticker:[...(notices.spotlight?[notices.spotlight]:[]),...notices.ticker];
       const messages=[...activeAlerts().slice(0,6).reverse().map(a=>(a.senderRole==="courier"?"MOTOBOY":"LOJISTA")+" • "+a.message),...tickerNotices.map(n=>"SISTEMA • "+n.title+" · "+n.body)];
-      const spans=messages.length?messages.map(message=>"<span>"+esc(message)+"</span>").join(""):"<span>SEM AVISOS NO MOMENTO</span>";
+      track.closest('.hero-alerts').hidden = messages.length === 0;
+      const spans = messages.map(message => "<span>" + esc(message) + "</span>").join("");
       const signature=JSON.stringify(messages);
       if(track.dataset.messages!==signature||track.dataset.rendered!==track.innerHTML){track.dataset.messages=signature;track.innerHTML=spans+spans;track.dataset.rendered=track.innerHTML;}
     }
@@ -1887,12 +1882,12 @@
   function mine(){ return data.orders.filter(o => role === "store" ? o.storeId === actor : role === "courier" ? o.courierId === actor : true); }
 
   function items(){
-    if (role === "store") return [["dashboard","⌂","Visão geral"],["new","＋","Pedir motoboy"],["routes","🛣️","Rotas"],["quotes","💬","Cotações"],["run","◷","Em execução"],["done","✓","Concluídos"],["reports","📊","Relatório"],["alerts","🔔","Alertas"]];
-    else if (role === "courier") return [["available","＋","Disponíveis"],["quotes","💬","Cotações"],["run","◷","Em execução"],["done","✓","Concluídos"],["reports","📊","Relatório"],["alerts","🔔","Alertas"]];
-    else return [["dashboard","⌂","Visão geral"],["all","▣","Todos"],["quotes","💬","Cotações"],["alerts","🔔","Alertas"],["reports","📊","Relatórios"],["offers","↗","Ofertas"],["rates","R$","Taxas"],["cities","⌖","Cidades"],["integrations","⇄","Integrações"],["registry","♙","Cadastros"]];
+    if (role === "store") return [["dashboard","⌂","Início"],["open","▣","Pedidos"],["routes","🛣️","Rotas"],["activity","◷","Histórico"],["run","◷","Em execução"],["quotes","💬","Cotações"],["reports","📊","Pagamentos"],["alerts","🔔","Alertas"]];
+    else if (role === "courier") return [["available","＋","Disponíveis"],["run","◷","Em execução"],["quotes","💬","Cotações"],["done","✓","Histórico"],["reports","📊","Relatório"],["alerts","🔔","Alertas"]];
+    else return [["dashboard","⌂","Visão geral"],["all","▣","Pedidos"],["reports","📊","Relatórios"],["registry","♙","Cadastros"],["quotes","💬","Cotações"],["alerts","🔔","Alertas"],["offers","↗","Ofertas"],["rates","R$","Taxas"],["cities","⌖","Cidades"],["integrations","⇄","Integrações"]];
   }
 
-  function title(){ return ({dashboard:"Visão geral",new:"Solicitar motoboy",quotes:"Mural de Cotações",alerts:"Central de Alertas",reports:"Relatórios de Caixa",routes:"Rotas múltiplas",profile:role === "courier" ? "Meu Pix" : "Perfil da Loja",open:"Pedidos em aberto",available:"Pedidos disponíveis",run:"Em execução",done:"Concluídos",offers:"Distribuição de ofertas",rates:"Tabela de Taxas",cities:"Cidades atendidas",integrations:"Integrações externas",registry:"Cadastros Globais"})[view]||"Visão geral"; }
+  function title(){ return ({dashboard:"Visão geral",new:"Solicitar motoboy",quotes:"Mural de Cotações",alerts:"Central de Alertas",reports:"Relatórios de Caixa",routes:"Rotas múltiplas",activity:"Histórico de pedidos",profile:role === "courier" ? "Meu Pix" : "Perfil da Loja",open:"Pedidos em aberto",available:"Pedidos disponíveis",run:"Em execução",done:"Concluídos",offers:"Distribuição de ofertas",rates:"Tabela de Taxas",cities:"Cidades atendidas",integrations:"Integrações externas",registry:"Cadastros Globais"})[view]||"Visão geral"; }
   function toast(s,t){ let e=document.createElement("div"); e.className="toast "+(t||""); e.textContent=s; document.getElementById("toasts").replaceChildren(e); setTimeout(()=>e.remove(),4000); }
   function empty(a,b){ return '<div class="empty"><b>'+a+'</b>'+b+'</div>'; }
   function stat(a,b,c,d){ return '<div class="stat"><div class="stat-top">'+a+'</div><div class="stat-value">'+b+'</div><div class="stat-sub">'+c+'</div></div>'; }
@@ -2094,6 +2089,7 @@
       const status=accountProfile?.accessStatus||'blocked';
       const labels={pending:'Cadastro aguardando aprovação',rejected:'Cadastro reprovado',blocked:'Acesso bloqueado'};
       document.getElementById('nav').innerHTML='';
+      document.getElementById('operations-summary').hidden=true;
       document.getElementById('content').innerHTML='<section class="panel" role="status"><h1>'+esc(labels[status]||'Acesso indisponível')+'</h1><p>'+(status==='pending'?'Sua conta foi criada. Aguarde a aprovação do administrador para começar a usar o Express Entregas.':'Procure o administrador para revisar seu acesso.')+'</p>'+(accountProfile?.accessReason?'<p><b>Motivo: </b>'+esc(accountProfile.accessReason)+'</p>':'')+'<button type="button" class="btn secondary" data-action="account-logout">Sair da conta</button></section>';
       document.getElementById('hero-alert-track').innerHTML='<span>ACESSO '+esc(status==='pending'?'PENDENTE':status==='rejected'?'REPROVADO':'BLOQUEADO')+'</span>';
       return;
@@ -2112,19 +2108,34 @@
     let people = role === "store" ? data.stores : role === "courier" ? data.couriers : [{id:"admin",name:"Administrador"}];
     if(role === "admin") actor = "admin"; if(people.length && !people.some(p => p.id === actor)) actor = people[0].id;
 
-    let availableCount = role === "courier" ? data.orders.filter(isOffer).length : 0;
-    document.getElementById("nav").innerHTML = items().map(n => {
-      let alert = n[0] === "available" && availableCount > 0;
-      return '<button type="button" class="'+(view===n[0]?"active":"")+'" data-nav="'+n[0]+'"><span class="'+(alert?"nav-pulse":"")+'">'+n[1]+'</span>'+n[2]+(alert?'<small class="nav-count">'+availableCount+'</small>':"")+'</button>';
-    }).join("");
+    const availableCount = role === "courier" ? data.orders.filter(isOffer).length : 0;
+    const nav = document.getElementById("nav");
+    const menuWasOpen = nav.querySelector(".nav-more")?.open;
+    const entries = items().map(([destination, icon, name]) => {
+      const count = destination === "available" ? availableCount : 0;
+      return `<button type="button" ${view === destination ? 'class="active" aria-current="page"' : ''} data-nav="${destination}">
+        <span aria-hidden="true" class="${count ? 'nav-pulse' : ''}">${icon}</span>${name}${count ? '<small class="nav-count">' + count + '</small>' : ''}
+      </button>`;
+    });
+    const more = items().slice(4).some(([destination]) => destination === view);
+    const navigation = '<div class="nav-primary">' + entries.slice(0, 4).join("") + '</div>' +
+      `<details class="nav-more"><summary class="${more ? 'active' : ''}"><span aria-hidden="true">☰</span>Menu</summary>
+      <div class="nav-more-items">${entries.slice(4).join("")}</div></details>`;
+    if (navigation !== nav.dataset.layout || !nav.firstElementChild) {
+      nav.innerHTML = navigation;
+      nav.dataset.layout = navigation;
+      nav.querySelector(".nav-more").open = Boolean(menuWasOpen);
+    }
     document.getElementById("role").innerHTML = [["store","Lojista"],["courier","Motoboy"],["admin","Administrador"]].map(x => '<option value="'+x[0]+'" '+(role===x[0]?"selected":"")+'>'+x[1]+'</option>').join("");
     document.getElementById("actor").innerHTML = people.map(p => '<option value="'+esc(p.id)+'" '+(p.id===actor?"selected":"")+'>'+esc(p.name)+'</option>').join("");
-    document.getElementById("actor").disabled = role === "admin" || !people.length;
+    document.getElementById("actor").disabled = people.length < 2;
+    document.getElementById("actor-option").hidden = people.length < 2;
+    document.getElementById("operations-summary").hidden = view !== "dashboard" && view !== "available";
     const accountLink = document.getElementById("account-profile-link");
     accountLink.dataset.nav = role === "admin" ? "dashboard" : "profile";
     accountLink.textContent = role === "admin" ? "Painel administrativo" : role === "courier" ? "Meu Pix" : "Minha conta";
     document.getElementById("avatar").textContent = initials(role === "admin" ? "Admin" : (person()||{}).name);
-    document.getElementById("crumb").textContent = label + " / " + title() + " · " + APP_VERSION; document.getElementById("page-title").textContent = title();
+    document.getElementById("crumb").textContent = "Express Entregas · " + label; document.getElementById("page-title").textContent = title();
     const presence = role === "courier" ? (data.presence || []).find(p => p.id === currentUser?.uid) || {} : {};
     const workSlots=role==='courier'?courierOccupiedSlots():0;
     const activeRoute=courierRunningOrders().some(o=>o.kind==='route');
@@ -2135,7 +2146,7 @@
     const preferencesOpen=document.querySelector("[data-browser-preferences]")?.open===true;
     const review = window.ExpressPayments.summary(mine());
     const paymentNotice = role === "courier" && review.reportedCount ? '<div class="info" role="status"><b>'+review.reportedCount+' pagamento(s) para conferir · '+cash(review.reported)+'</b><p>A loja informou o pagamento. Confira sua conta e confirme o recebimento. Você pode continuar aceitando corridas.</p><button type="button" class="btn secondary tiny" data-nav="reports">Conferir pagamentos</button></div>' : '';
-    const overdueNotice = role === "store" && review.overdueCount ? '<div class="info" role="status"><b>'+review.overdueCount+' pendência(s) de dias anteriores · '+cash(review.overdue)+'</b><p>Confira o que falta pagar e o que aguarda confirmação do motoboy.</p><button type="button" class="btn secondary tiny" data-nav="reports">Ver pendências</button></div>' : '';
+    const overdueNotice = role === "store" && view !== "dashboard" && view !== "reports" && review.overdueCount ? '<div class="info" role="status"><b>'+review.overdueCount+' pendência(s) de dias anteriores · '+cash(review.overdue)+'</b><p>Confira o que falta pagar e o que aguarda confirmação do motoboy.</p><button type="button" class="btn secondary tiny" data-nav="reports">Ver pendências</button></div>' : '';
     const t=window.ExpressTariffs;
     const weather=t.rain(tariffConfig);
     const browserNotices=window.ExpressBrowserNotices.select(systemNotices,serverNow());
@@ -2182,6 +2193,7 @@
     if(view==='integrations'&&role==='admin')return integrationsView();
     if(view==="routes"&&role==="store")return routesView();
     if(view==="dashboard") return dashboard();
+    if(view==="activity" && role==="store") return recentActivity(mine().filter(operational));
     if(view==="alerts") return alertsView();
     if(view==="new" && role==="store") { openOrderSheet(); return dashboard(); }
     if(view==="reports") return reportsView();
@@ -2532,7 +2544,7 @@
     });
   }
 
-  function recentActivity(orders) {
+  function recentActivity(orders, compact = false) {
     const dayFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
     const timeFormat = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' });
     const timestamp = order => {
@@ -2541,6 +2553,20 @@
     };
     const history = orders.filter(order => ['done', 'cancelled', 'cancelado_cotacao', 'route_done', 'route_cancelled'].includes(order.status))
       .sort((a, b) => timestamp(b) - timestamp(a));
+    if (compact) {
+      const activity = history.slice(0, 3).map(order => {
+        const finished = order.status === 'done' || order.status === 'route_done';
+        const label = order.address || order.clientNeighborhood || order.orderCode || 'Entrega';
+        const payment = order.status === 'done' && window.ExpressPayments.paymentState(order) !== 'confirmed';
+        return `<li><span><strong>${esc(label)}</strong><small>${finished ? 'Entregue' : 'Cancelado'}${payment ? ' · Pagamento pendente' : ''}</small></span>
+          ${finished ? '<b>' + cash(order.fee) + '</b>' : ''}</li>`;
+      }).join('');
+      return `<section class="panel overview-activity" aria-labelledby="overview-activity-title">
+        <h2 id="overview-activity-title">Atividade recente</h2>
+        ${activity ? '<ul>' + activity + '</ul>' : '<p>Nenhuma entrega concluída ou cancelada.</p>'}
+        <button type="button" class="btn secondary" data-nav="activity">Ver todas as atividades</button>
+      </section>`;
+    }
     const groups = new Map();
     for (const order of history) {
       const at = timestamp(order);
@@ -2576,29 +2602,38 @@
   }
 
   function dashboard(){
-    const os=mine().filter(operational);
-    const op=os.filter(o=>["open","route_open","return_priority"].includes(o.status));
-    const run=os.filter(o=>o.status==="run");
-    const quotes=os.filter(o=>o.status==="cotacao"||o.status==="cotacao_aceita");
-    const done=os.filter(o=>o.status==="done");
-    const unpaid=done.filter(o=>!o.paid);
-    let storeProfileWarning="";
-    if(role==="store"){
-      const st=person();
-      if(!st||!st.address)storeProfileWarning='<div class="info">⚠️ <b>Atenção:</b> Cadastre o endereço da loja em <a href="#" data-nav="profile">Perfil</a>.</div>';
-    }
+    const orders = mine().filter(operational);
+    const summary = window.ExpressPayments.summary(orders);
+    const active = orders.filter(order => order.status === "run").length;
+    const open = orders.filter(order => ["open", "route_open", "return_priority"].includes(order.status)).length;
+    const quotes = orders.filter(order => ["cotacao", "cotacao_aceita"].includes(order.status)).length;
+    const returns = orders.filter(order => ["awaiting_return", "awaiting_quote_return"].includes(order.status)).length;
+    const pending = orders.filter(order => order.status === "done" && window.ExpressPayments.paymentState(order) !== "confirmed").length;
+    const store = person();
+    const storeName = store?.name || "Express Entregas";
     const stats = [
-      ["run", "Em execução", run.length, "Corridas ativas"],
-      ["open", "Em aberto", op.length, "Aguardando motoboy"],
-      ["quotes", "Cotações", quotes.length, "Aguardando propostas"],
-      ["reports", "Não acertados", unpaid.length, cash(unpaid.reduce((sum, order) => sum + Number(order.fee || 0), 0))]
-    ].map(([destination, label, count, detail]) => `<button type="button" class="stat overview-stat" data-nav="${destination}">
-      <span class="stat-top">${label}</span><span class="stat-value">${count}</span><span class="stat-sub">${detail}</span></button>`).join("");
-    const storeName = person()?.name || "Express Entregas";
-    const section=(title,list,emptyTitle,emptyText)=>!list.length?'':'<section class="panel dashboard-section"><div class="panel-head"><h2>'+title+'</h2><span class="section-count">'+list.length+'</span></div>'+(list.length?'<div class="list">'+list.map(card).join("")+'</div>':empty(emptyTitle,emptyText))+'</section>';
-    const actions=role==="store"?'<div class="dashboard-actions"><button type="button" class="btn primary" data-open-sheet data-sheet-mode="delivery">＋ Pedir motoboy</button><button type="button" class="btn secondary" data-open-sheet data-sheet-mode="quote">💬 Pedir cotação</button></div>':"";
-    return storeProfileWarning+'<div class="head store-overview"><div><p>Bem-vindo de volta</p><h1 class="'+(storeName.length > 20 ? "long-store-name" : "")+'">'+esc(storeName)+'</h1></div>'+actions+'</div><div class="grid stats">'+stats+'</div>'+(role==="store"?section("Em execução",run.sort((a,b)=>Number(b.accepted||0)-Number(a.accepted||0)),"Nenhuma corrida em execução","As corridas aceitas aparecerão aqui.")+section("Em aberto",op.sort((a,b)=>Number(a.created||0)-Number(b.created||0)),"Nenhum pedido em aberto","Os pedidos aguardando motoboy aparecerão aqui.")+section("Aguardando devolução",os.filter(o=>["awaiting_return","awaiting_quote_return"].includes(o.status)),"Nenhuma devolução pendente","As devoluções aguardando liberação aparecerão aqui.")+section("Aguardando cotação",quotes.sort((a,b)=>Number(b.created||0)-Number(a.created||0)),"Nenhuma cotação pendente","As propostas especiais aparecerão aqui."):"")+recentActivity(os);
+      ["run", "Em execução", active],
+      ["open", "Em aberto", open],
+      ["quotes", "Cotações", quotes],
+      ["reports", "Pagamentos pendentes", pending]
+    ].map(([destination, label, count]) => `<button type="button" class="stat overview-stat" data-nav="${destination}">
+      <span class="stat-value">${count}</span><span class="stat-top">${label}</span></button>`).join("");
+
+    return `<div class="store-dashboard">
+      <div class="head store-overview"><h1 class="${storeName.length > 20 ? 'long-store-name' : ''}">${esc(storeName)}</h1></div>
+      ${!store?.address ? '<div class="info">Para pedir motoboy, <a href="#" data-nav="profile">cadastre o endereço da loja</a>.</div>' : ''}
+      <div class="dashboard-actions">
+        <button type="button" class="btn primary" data-open-sheet data-sheet-mode="delivery">Pedir motoboy</button>
+        <button type="button" class="btn secondary" data-open-sheet data-sheet-mode="quote">Pedir cotação</button>
+      </div>
+      ${pending ? `<button type="button" class="overview-payment" data-nav="reports"><span><b>${pending === 1 ? '1 pagamento pendente' : pending + ' pagamentos pendentes'}</b>
+        ${summary.overdueCount ? '<small>' + summary.overdueCount + ' de dias anteriores</small>' : ''}</span><strong>${cash(summary.pending)}</strong></button>` : ''}
+      ${returns ? `<button type="button" class="btn secondary overview-returns" data-nav="open">${returns === 1 ? '1 devolução para liberar' : returns + ' devoluções para liberar'}</button>` : ''}
+      <section aria-labelledby="overview-orders-title"><h2 id="overview-orders-title">Resumo de pedidos</h2><div class="grid stats overview-stats">${stats}</div></section>
+      ${recentActivity(orders, true)}
+    </div>`;
   }
+
 
   // Atualiza a idade e a prioridade da fila mesmo sem novas alterações no Firebase.
   setInterval(() => {
