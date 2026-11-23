@@ -1,0 +1,54 @@
+name: Publicar prévia V3.0 no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v6
+      - name: Preparar GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Gerar site e rastreio
+        run: npm run build:web
+      - name: Verificar pacote
+        run: npm run check
+      - name: Enviar artefato do site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: www
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

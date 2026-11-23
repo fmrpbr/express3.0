@@ -6,6 +6,7 @@ firebase-debug.log
 database-debug.log
 *-debug.log
 www/firebase-config.js
+www/rastreio/
 **/.env*
 playwright-report/
 test-results/

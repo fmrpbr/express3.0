@@ -12,4 +12,6 @@ await copyFile('icons/icon-192.png', 'public-tracking/rastreio/icon.png');
 await copyFile('tracking/style.css', 'public-tracking/rastreio/style.css');
 await writeFile('public-tracking/index.html', '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Express Entregas</title><p>Abra o link de acompanhamento enviado pela loja.</p></html>');
 await build({ entryPoints: ['tracking/track.js'], bundle: true, minify: true, outfile: 'public-tracking/rastreio/app.js', define: { __EXPRESS_PUBLIC_FIREBASE__: JSON.stringify(config) } });
+await mkdir('www/rastreio', { recursive: true });
+for (const name of ['index.html', 'icon.png', 'style.css', 'app.js']) await copyFile(`public-tracking/rastreio/${name}`, `www/rastreio/${name}`);
 console.log('Página pública de rastreio gerada. Nenhum dado privado ou segredo incluído.');

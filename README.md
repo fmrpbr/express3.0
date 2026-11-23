@@ -29,7 +29,13 @@ npm run test:browser
 
 O teste browser usa Auth e Realtime Database em emuladores locais. `www/firebase-config.js` é configuração local e fica ignorado pelo Git; o build pode gerar uma cópia baseada no exemplo. O exemplo contém apenas configuração cliente do projeto de testes, não credenciais privadas. Confirme o isolamento do projeto hospedado antes de usar qualquer configuração remota.
 
-`firebase.json` contém apenas Functions, regras e emuladores locais; este repositório não inclui Hosting, workflow de deploy nem site de produção configurado.
+## Prévia web
+
+O GitHub Pages publica uma prévia em <https://fmrpbr.github.io/express3.0/> a partir da pasta `www/`. O workflow compila os assets e usa a configuração Firebase do projeto de testes `express-entregas-2-testes`; esta publicação não configura nem altera o Firebase de produção.
+
+O site e o repositório são públicos. Não inclua credenciais privadas, dados reais ou arquivos `.env` neste repositório. A integração de push web permanece sem chave VAPID.
+
+`firebase.json` segue sem destino Hosting: o deploy de páginas está limitado ao GitHub Pages e não executa deploy de Functions nem de regras.
 
 ## Limite da candidata
 
