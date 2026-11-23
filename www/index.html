@@ -280,7 +280,7 @@
     window.__expressAuthMode = mode;
     var registering = mode === "register";
     document.getElementById("login-role-tabs").hidden = !registering;
-    document.getElementById("login-heading").textContent = registering ? "Crie sua conta" : "Bem-vindo de volta!";
+    document.getElementById("login-heading").textContent = registering ? "Crie sua conta" : "Bem-vindo";
     document.getElementById("login-description").textContent = registering ? "Escolha seu perfil para começar." : "Acesse sua conta para continuar.";
     var passwordInput = document.getElementById("auth-password");
     passwordInput.autocomplete = registering ? "new-password" : "current-password";
@@ -388,7 +388,7 @@
     </div>
 
     <div class="login-heading">
-      <h2 id="login-heading">Bem-vindo de volta!</h2>
+      <h2 id="login-heading">Bem-vindo</h2>
       <p id="login-description">Acesse sua conta para continuar.</p>
     </div>
 
